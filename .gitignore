@@ -1,0 +1,17 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+
+# Project I/O
+Input/**
+output/**
+# אבל השאירי את תוצאות הסקור בפנים
+!output/*.json
+
+# Editors
+.vscode/
+.idea/

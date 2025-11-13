@@ -28,7 +28,7 @@ PAT_BIRTH_PHRASES = re.compile(
 PAT_RANGE = re.compile(r"(19\d{2}|20\d{2})\s*[-–]\s*(19\d{2}|20\d{2})")
 
 
-def infer_birth_year_simple(text: str) -> tuple[int|None, str]:
+def infer_birth_year_simple(text: str) -> tuple[int | None, str]:
     s = text or ""
     m = PAT_BIRTH_PHRASES.search(s)
     if m:
@@ -46,16 +46,16 @@ def infer_birth_year_simple(text: str) -> tuple[int|None, str]:
     return None, "none"
 
 
-def age_from_birth_year(by: int|None) -> int|None:
+def age_from_birth_year(by: int | None) -> int | None:
     if by is None:
         return None
     return max(0, CURRENT_YEAR - by)
 
 
-def apply_age_penalty(base_score: float, age: int|None) -> dict:
+def apply_age_penalty(base_score: float, age: int | None) -> dict:
     """
-    אם age>50 → הורדה של 10%.
-    מחזיר dict עם factor ו-score_final.
+    אם age>50 → הורדה של 10% מהציון הגולמי (100 -> 90).
+    זה חישוב עזר בלבד לצורך שקיפות.
     """
     if age is None:
         return {"penalized": False, "factor": 1.0, "score_final": base_score}
@@ -108,34 +108,46 @@ def main():
         age = age_from_birth_year(by)
         penalty = apply_age_penalty(args.base, age)
 
+        # 🌟 כאן אנחנו ממירים ל-0–10 נקודות עבור רכיב הגיל
+        if age is None or age <= 50:
+            age_score_points = 10.0
+            print("DEBUG SAVING age_score_points =", age_score_points)
+
+        else:
+            age_score_points = 0.0
+
         print(f"   Birth year (inferred): {by}   (reason={reason})")
         print(f"   Age (inferred):        {age}")
-        print(f"   Penalized:             {penalty['penalized']} (factor={penalty['factor']})")
-        print(f"   Score:                 {args.base:.2f} -> {penalty['score_final']:.2f}")
+        print(f"   Penalized (0–100 view): {penalty['penalized']} (factor={penalty['factor']})")
+        print(f"   Raw score 0–100:       {args.base:.2f} -> {penalty['score_final']:.2f}")
+        print(f"   Age score 0–10:        {age_score_points}\n")
 
-        # 🔹 שמירה למסד הנתונים
+        # 🔹 שמירה למסד הנתונים – age_score עכשיו ב־0–10
         cv_id = dbutil.upsert_candidate(con, str(p))
         dbutil.upsert_age_score(
-            con, cv_id,
-            age_score=penalty["score_final"],
+            con,
+            cv_id,
+            age_score=age_score_points,       # 👈 הניקוד שתשתמשי בו בציון הסופי
             birth_year=by,
             age=age,
             reason=reason,
             confidence="N/A",
-            factor=penalty["factor"],
-            final_score=None
+            factor=penalty["factor"],          # עדיין שומרת את factor 0.9/1.0 למעקב
+            final_score=None                   # שמור לעתיד לציון סופי משולב
         )
 
-        # בנוסף נשמור גם קובץ JSON כמו קודם
+        # בנוסף נשמור גם קובץ JSON
         out = {
             "file": str(p),
             "birth_year": by,
             "age": age,
+            "age_score_points": age_score_points,          # 0–10 לציון הסופי
             "age_penalty": {
                 "penalized": penalty["penalized"],
                 "factor": penalty["factor"],
             },
-            "final_score": penalty["score_final"],
+            "raw_penalized_0_100": penalty["score_final"], # המבט ההיסטורי 100/90
+            "final_score": age_score_points,               # לצורך age-component בתמונה הכללית
             "reason": reason,
             "year_now": CURRENT_YEAR,
         }

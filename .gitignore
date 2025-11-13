@@ -15,3 +15,6 @@ output/**
 # Editors
 .vscode/
 .idea/
+
+cv_matcher.db
+*.db

@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HIRELY - דשבורד מגייס</title>
+
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Arial, Helvetica, sans-serif;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    html {
+      height: 100%;
+    }
+
+    .dashboard-container {
+      min-height: 100%;
+      background: #f8fafc;
+    }
+
+    .header {
+      background: white;
+      padding: 20px 30px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .logo-text {
+      font-size: 24px;
+      font-weight: 800;
+      color: #667eea;
+      letter-spacing: 1px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .logout-btn {
+      background: #f56565;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      background: #e53e3e;
+      transform: translateY(-1px);
+    }
+
+    .main-content {
+      padding: 30px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .jobs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .job-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .job-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      border-color: #667eea;
+    }
+
+    .job-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 12px;
+    }
+
+    .job-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .job-detail {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .candidates-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .candidates-count {
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .new-candidates {
+      background: #667eea;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .job-details-view {
+      display: none;
+    }
+
+    .back-btn {
+      background: #718096;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .back-btn:hover {
+      background: #4a5568;
+      transform: translateY(-1px);
+    }
+
+    .filters {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .filter-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 14px;
+    }
+
+    .filter-select {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .candidates-list {
+      display: grid;
+      gap: 15px;
+    }
+
+    .candidate-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border-right: 4px solid transparent;
+    }
+
+    .candidate-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    .candidate-card.new {
+      border-right-color: #667eea;
+      background: linear-gradient(90deg, #f0f4ff 0%, white 10%);
+    }
+
+    .candidate-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .candidate-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a202c;
+    }
+
+    .match-score {
+      background: #48bb78;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .candidate-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .candidate-detail-view {
+      display: none;
+    }
+
+    .candidate-profile {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .profile-name {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 10px;
+    }
+
+    .profile-match {
+      font-size: 24px;
+      font-weight: 600;
+      color: #48bb78;
+    }
+
+    .profile-sections {
+      display: grid;
+      gap: 25px;
+      margin-bottom: 30px;
+    }
+
+    .profile-section {
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 15px;
+    }
+
+    .section-content {
+      color: #4a5568;
+      line-height: 1.6;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-suitable {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-suitable:hover {
+      background: #38a169;
+      transform: translateY(-1px);
+    }
+
+    .btn-not-suitable {
+      background: #f56565;
+      color: white;
+    }
+
+    .btn-not-suitable:hover {
+      background: #e53e3e;
+      transform: translateY(-1px);
+    }
+
+    .btn-review {
+      background: #ed8936;
+      color: white;
+    }
+
+    .btn-review:hover {
+      background: #dd6b20;
+      transform: translateY(-1px);
+    }
+
+    .notes-section {
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .notes-label {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .notes-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .submit-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .submit-btn:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+    }
+
+    .status-processed {
+      background: #e2e8f0;
+      color: #4a5568;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .success-message {
+      background: #48bb78;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 500;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        padding: 15px 20px;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .main-content {
+        padding: 20px 15px;
+      }
+
+      .jobs-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filters-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+      }
+
+      .action-btn {
+        min-width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="header">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="24" fill="#667eea" />
+          <path d="M14 18h20v3h-20v-3zm0 6h20v3h-20v-3zm0 6h15v3h-15v-3z" fill="white" />
+          <circle cx="32" cy="16" r="6" fill="#48bb78" />
+          <path d="M30 16l1.5 1.5 3-3" stroke="white" stroke-width="1.5" fill="none" />
+        </svg>
+        <span class="logo-text">HIRELY</span>
+      </div>
+
+      <div class="user-info">
+        <!-- שים לב: כאן נכנס השם מהבק -->
+        <span class="user-name">שלום, {{ user_name }}</span>
+        <button class="logout-btn" id="logoutBtn">התנתק</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- הודעת הצלחה -->
+      <div class="success-message" id="successMessage">
+        הפעולה בוצעה בהצלחה!
+      </div>
+
+      <!-- Dashboard View -->
+      <div id="dashboardView">
+        <h1 class="page-title" id="dashboardTitle">דשבורד מגייס</h1>
+        <h2 id="jobsSectionTitle" style="font-size: 24px; font-weight: 600; color: #2d3748; margin-bottom: 20px;">
+          משרות פתוחות
+        </h2>
+        <div class="jobs-grid" id="jobsGrid">
+          <!-- משרות ייכנסו כאן בג'אווהסקריפט -->
+        </div>
+      </div>
+
+      <!-- Job Details View -->
+      <div id="jobDetailsView" class="job-details-view">
+        <button class="back-btn" id="backToJobs">← חזרה לדשבורד</button>
+        <h1 class="page-title" id="jobDetailsTitle">פרטי משרה</h1>
+
+        <div class="filters">
+          <div class="filters-grid">
+            <div class="filter-group">
+              <label class="filter-label">אחוז התאמה</label>
+              <select class="filter-select" id="matchFilter">
+                <option value="">כל האחוזים</option>
+                <option value="high">90%+</option>
+                <option value="medium">70-89%</option>
+                <option value="low">50-69%</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">גיל</label>
+              <select class="filter-select" id="ageFilter">
+                <option value="">כל הגילאים</option>
+                <option value="young">20-30</option>
+                <option value="middle">31-45</option>
+                <option value="senior">46+</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">שנות ניסיון</label>
+              <select class="filter-select" id="experienceFilter">
+                <option value="">כל רמות הניסיון</option>
+                <option value="junior">0-2 שנים</option>
+                <option value="mid">3-7 שנים</option>
+                <option value="senior">8+ שנים</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">סטטוס</label>
+              <select class="filter-select" id="statusFilter">
+                <option value="">כל הסטטוסים</option>
+                <option value="new">חדש</option>
+                <option value="processed">טופל</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="candidates-list" id="candidatesList">
+          <!-- מועמדים ייכנסו כאן בג'אווהסקריפט -->
+        </div>
+      </div>
+
+      <!-- Candidate Detail View -->
+      <div id="candidateDetailView" class="candidate-detail-view">
+        <button class="back-btn" id="backToCandidates">← חזרה לרשימת מועמדים</button>
+        <div class="candidate-profile" id="candidateProfile"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // דמו של משרות ומועמדים – כרגע בצד לקוח.
+    // בהמשך נוכל להחליף לקריאה ל-API מהבק.
+    const jobsData = [
+      {
+        id: 1,
+        title: "מפתח Full Stack",
+        location: "תל אביב",
+        openDate: "2024-01-15",
+        totalCandidates: 24,
+        newCandidates: 5
+      },
+      {
+        id: 2,
+        title: "מנהל פרויקטים",
+        location: "חיפה",
+        openDate: "2024-01-10",
+        totalCandidates: 18,
+        newCandidates: 3
+      },
+      {
+        id: 3,
+        title: "מעצב UX/UI",
+        location: "ירושלים",
+        openDate: "2024-01-20",
+        totalCandidates: 31,
+        newCandidates: 8
+      },
+      {
+        id: 4,
+        title: "מהנדס DevOps",
+        location: "רמת גן",
+        openDate: "2024-01-12",
+        totalCandidates: 15,
+        newCandidates: 2
+      }
+    ];
+
+    const candidatesData = {
+      1: [
+        {
+          id: 101,
+          name: "דני לוי",
+          age: 28,
+          experience: 5,
+          location: "תל אביב",
+          matchScore: 92,
+          isNew: true,
+          status: "new",
+          skills: "React, Node.js, MongoDB, AWS",
+          education: "תואר ראשון במדעי המחשב - אוניברסיטת תל אביב",
+          summary: "מפתח Full Stack עם 5 שנות ניסיון בפיתוח אפליקציות web מתקדמות. התמחות ב-React ו-Node.js עם ניסיון נרחב ב-AWS."
+        },
+        {
+          id: 102,
+          name: "מיכל כהן",
+          age: 32,
+          experience: 7,
+          location: "רמת גן",
+          matchScore: 88,
+          isNew: false,
+          status: "processed",
+          skills: "Angular, .NET, SQL Server, Azure",
+          education: "תואר ראשון בהנדסת תוכנה - הטכניון",
+          summary: "מפתחת בכירה עם ניסיון רב בפיתוח מערכות enterprise. מתמחה בטכנולוגיות Microsoft ו-Angular."
+        },
+        {
+          id: 103,
+          name: "יוסי אברהם",
+          age: 26,
+          experience: 3,
+          location: "פתח תקווה",
+          matchScore: 75,
+          isNew: true,
+          status: "new",
+          skills: "Vue.js, Python, PostgreSQL, Docker",
+          education: "תואר ראשון במדעי המחשב - אוניברסיטת בר אילן",
+          summary: "מפתח צעיר ומוכשר עם ניסיון בפיתוח אפליקציות web מודרניות. מתמחה ב-Vue.js ו-Python."
+        }
+      ]
+    };
+
+    let currentJobId = null;
+    let currentCandidateId = null;
+    let allCandidates = [];
+
+    function renderJobs() {
+      const jobsGrid = document.getElementById('jobsGrid');
+      jobsGrid.innerHTML = '';
+
+      jobsData.forEach(job => {
+        const jobCard = document.createElement('div');
+        jobCard.className = 'job-card';
+        jobCard.onclick = () => showJobDetails(job.id);
+
+        jobCard.innerHTML = `
+          <div class="job-title">${job.title}</div>
+          <div class="job-details">
+            <div class="job-detail">
+              <span>📍</span>
+              <span>${job.location}</span>
+            </div>
+            <div class="job-detail">
+              <span>📅</span>
+              <span>נפתח: ${formatDate(job.openDate)}</span>
+            </div>
+          </div>
+          <div class="candidates-info">
+            <span class="candidates-count">${job.totalCandidates} מועמדים</span>
+            ${job.newCandidates > 0 ? `<span class="new-candidates">${job.newCandidates} חדשים</span>` : ''}
+          </div>
+        `;
+
+        jobsGrid.appendChild(jobCard);
+      });
+    }
+
+    function showJobDetails(jobId) {
+      currentJobId = jobId;
+      const job = jobsData.find(j => j.id === jobId);
+
+      document.getElementById('dashboardView').style.display = 'none';
+      document.getElementById('jobDetailsView').style.display = 'block';
+      document.getElementById('candidateDetailView').style.display = 'none';
+
+      document.getElementById('jobDetailsTitle').textContent = `מועמדים למשרת ${job.title}`;
+
+      allCandidates = candidatesData[jobId] || [];
+      renderCandidates(allCandidates);
+      attachFiltersHandlers();
+    }
+
+    function renderCandidates(candidates) {
+      const candidatesList = document.getElementById('candidatesList');
+      candidatesList.innerHTML = '';
+
+      candidates.forEach(candidate => {
+        const candidateCard = document.createElement('div');
+        candidateCard.className = `candidate-card ${candidate.isNew ? 'new' : ''}`;
+        candidateCard.onclick = () => showCandidateDetails(candidate.id);
+
+        candidateCard.innerHTML = `
+          <div class="candidate-header">
+            <span class="candidate-name">${candidate.name}</span>
+            <span class="match-score">${candidate.matchScore}% התאמה</span>
+          </div>
+          <div class="candidate-info">
+            <div>גיל: ${candidate.age}</div>
+            <div>ניסיון: ${candidate.experience} שנים</div>
+            <div>מיקום: ${candidate.location}</div>
+            <div>סטטוס: ${candidate.status === 'new' ? 'חדש' : 'טופל'}</div>
+          </div>
+        `;
+
+        candidatesList.appendChild(candidateCard);
+      });
+    }
+
+    function attachFiltersHandlers() {
+      // פעם אחת – מוסיפים listeners לפילטרים
+      document.getElementById('matchFilter').onchange = filterCandidates;
+      document.getElementById('ageFilter').onchange = filterCandidates;
+      document.getElementById('experienceFilter').onchange = filterCandidates;
+      document.getElementById('statusFilter').onchange = filterCandidates;
+    }
+
+    function filterCandidates() {
+      const matchFilter = document.getElementById('matchFilter').value;
+      const ageFilter = document.getElementById('ageFilter').value;
+      const experienceFilter = document.getElementById('experienceFilter').value;
+      const statusFilter = document.getElementById('statusFilter').value;
+
+      let filtered = [...allCandidates];
+
+      if (matchFilter) {
+        filtered = filtered.filter(candidate => {
+          if (matchFilter === 'high') return candidate.matchScore >= 90;
+          if (matchFilter === 'medium') return candidate.matchScore >= 70 && candidate.matchScore < 90;
+          if (matchFilter === 'low') return candidate.matchScore >= 50 && candidate.matchScore < 70;
+          return true;
+        });
+      }
+
+      if (ageFilter) {
+        filtered = filtered.filter(candidate => {
+          if (ageFilter === 'young') return candidate.age <= 30;
+          if (ageFilter === 'middle') return candidate.age > 30 && candidate.age <= 45;
+          if (ageFilter === 'senior') return candidate.age > 45;
+          return true;
+        });
+      }
+
+      if (experienceFilter) {
+        filtered = filtered.filter(candidate => {
+          if (experienceFilter === 'junior') return candidate.experience <= 2;
+          if (experienceFilter === 'mid') return candidate.experience > 2 && candidate.experience <= 7;
+          if (experienceFilter === 'senior') return candidate.experience > 7;
+          return true;
+        });
+      }
+
+      if (statusFilter) {
+        filtered = filtered.filter(candidate => candidate.status === statusFilter);
+      }
+
+      renderCandidates(filtered);
+    }
+
+    function showCandidateDetails(candidateId) {
+      currentCandidateId = candidateId;
+      const candidate = allCandidates.find(c => c.id === candidateId);
+
+      document.getElementById('jobDetailsView').style.display = 'none';
+      document.getElementById('candidateDetailView').style.display = 'block';
+
+      document.getElementById('candidateProfile').innerHTML = `
+        <div class="profile-header">
+          <div class="profile-name">${candidate.name}</div>
+          <div class="profile-match">${candidate.matchScore}% התאמה למשרה</div>
+        </div>
+
+        <div class="profile-sections">
+          <div class="profile-section">
+            <div class="section-title">פרטים אישיים</div>
+            <div class="section-content">
+              <strong>גיל:</strong> ${candidate.age}<br>
+              <strong>מיקום:</strong> ${candidate.location}<br>
+              <strong>שנות ניסיון:</strong> ${candidate.experience}
+            </div>
+          </div>
+
+          <div class="profile-section">
+            <div class="section-title">השכלה</div>
+            <div class="section-content">${candidate.education}</div>
+          </div>
+
+          <div class="profile-section">
+            <div class="section-title">כישורים טכניים</div>
+            <div class="section-content">${candidate.skills}</div>
+          </div>
+
+          <div class="profile-section">
+            <div class="section-title">תקציר מקצועי</div>
+            <div class="section-content">${candidate.summary}</div>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="action-btn btn-suitable" onclick="updateCandidateStatus('suitable')">
+            ✅ מתאים
+          </button>
+          <button class="action-btn btn-not-suitable" onclick="updateCandidateStatus('not_suitable')">
+            ❌ לא מתאים
+          </button>
+          <button class="action-btn btn-review" onclick="updateCandidateStatus('review')">
+            🕓 יש לבדוק
+          </button>
+        </div>
+
+        <div class="notes-section">
+          <label class="notes-label">הערה למנהל הגיוס:</label>
+          <textarea class="notes-textarea" id="candidateNotes" placeholder="הזיני הערות או הערכות נוספות..."></textarea>
+        </div>
+
+        <button class="submit-btn" onclick="submitCandidateReview()">שלח הערכה</button>
+      `;
+    }
+
+    function updateCandidateStatus(status) {
+      const candidate = allCandidates.find(c => c.id === currentCandidateId);
+      if (candidate) {
+        candidate.status = 'processed';
+      }
+    }
+
+    function submitCandidateReview() {
+      const notes = document.getElementById('candidateNotes').value;
+      const candidate = allCandidates.find(c => c.id === currentCandidateId);
+      if (candidate) {
+        candidate.status = 'processed';
+        candidate.notes = notes;
+      }
+
+      showMessage('הערכת המועמד נשלחה בהצלחה!');
+      setTimeout(() => {
+        showJobDetails(currentJobId);
+      }, 1500);
+    }
+
+    function showDashboard() {
+      document.getElementById('dashboardView').style.display = 'block';
+      document.getElementById('jobDetailsView').style.display = 'none';
+      document.getElementById('candidateDetailView').style.display = 'none';
+    }
+
+    function showJobDetailsView() {
+      document.getElementById('jobDetailsView').style.display = 'block';
+      document.getElementById('candidateDetailView').style.display = 'none';
+      renderCandidates(allCandidates);
+    }
+
+    function showMessage(message) {
+      const successMessage = document.getElementById('successMessage');
+      successMessage.textContent = message;
+      successMessage.classList.add('show');
+      setTimeout(() => {
+        successMessage.classList.remove('show');
+      }, 3000);
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('he-IL');
+    }
+
+    // חיבור כפתורים
+    document.addEventListener('DOMContentLoaded', function () {
+      renderJobs();
+
+      document.getElementById('backToJobs').onclick = showDashboard;
+      document.getElementById('backToCandidates').onclick = showJobDetailsView;
+
+      // התנתקות – קריאה לנתיב /logout בבק
+      document.getElementById('logoutBtn').onclick = async function () {
+        try {
+          await fetch('/logout', { method: 'POST' });
+        } catch (e) {}
+        window.location.href = '/';
+      };
+    });
+  </script>
+</body>
+</html>

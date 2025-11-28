@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HIRELY - דשבורד מנהל מגייס</title>
+
+  <!-- בלי ה-SDKים של Canva / Cloudflare, פה האתר עובד כרגיל אצלך -->
+
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Arial, Helvetica, sans-serif;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    html {
+      height: 100%;
+    }
+
+    .dashboard-container {
+      min-height: 100%;
+      background: #f8fafc;
+    }
+
+    .header {
+      background: white;
+      padding: 20px 30px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .logo-text {
+      font-size: 24px;
+      font-weight: 800;
+      color: #667eea;
+      letter-spacing: 1px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .logout-btn {
+      background: #f56565;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      background: #e53e3e;
+      transform: translateY(-1px);
+    }
+
+    .main-content {
+      padding: 30px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .tabs-container {
+      margin-bottom: 30px;
+    }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 15px 20px;
+      background: #f7fafc;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      color: #4a5568;
+      transition: all 0.3s ease;
+      border-bottom: 3px solid transparent;
+    }
+
+    .tab.active {
+      background: white;
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab:hover:not(.active) {
+      background: #edf2f7;
+      color: #2d3748;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .jobs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .job-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .job-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      border-color: #667eea;
+    }
+
+    .job-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 12px;
+    }
+
+    .job-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .job-detail {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .candidates-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .candidates-count {
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .approved-badge {
+      background: #48bb78;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .candidates-list {
+      display: grid;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .candidate-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      border-right: 4px solid #48bb78;
+    }
+
+    .candidate-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .candidate-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a202c;
+    }
+
+    .candidate-status {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-approved {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .status-phone {
+      background: #bee3f8;
+      color: #2a4365;
+    }
+
+    .status-interview {
+      background: #feebc8;
+      color: #744210;
+    }
+
+    .status-accepted {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .status-rejected {
+      background: #fed7d7;
+      color: #742a2a;
+    }
+
+    .candidate-info {
+      margin-bottom: 15px;
+    }
+
+    .candidate-description {
+      color: #4a5568;
+      font-size: 14px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    .recruiter-note {
+      background: #f7fafc;
+      padding: 12px;
+      border-radius: 8px;
+      border-right: 3px solid #667eea;
+      margin-bottom: 15px;
+    }
+
+    .note-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .note-text {
+      color: #4a5568;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-phone {
+      background: #bee3f8;
+      color: #2a4365;
+    }
+
+    .btn-phone:hover {
+      background: #90cdf4;
+    }
+
+    .btn-interview {
+      background: #feebc8;
+      color: #744210;
+    }
+
+    .btn-interview:hover {
+      background: #fbd38d;
+    }
+
+    .btn-accept {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .btn-accept:hover {
+      background: #9ae6b4;
+    }
+
+    .btn-reject {
+      background: #fed7d7;
+      color: #742a2a;
+    }
+
+    .btn-reject:hover {
+      background: #feb2b2;
+    }
+
+    .job-form {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 14px;
+    }
+
+    .form-input,
+    .form-textarea,
+    .form-select {
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .submit-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 16px;
+    }
+
+    .submit-btn:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+    }
+
+    .history-table {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .table-header {
+      background: #f7fafc;
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: 600;
+      color: #2d3748;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 20px;
+    }
+
+    .table-row {
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 20px;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+
+    .table-row:hover {
+      background: #f7fafc;
+    }
+
+    .table-row:last-child {
+      border-bottom: none;
+    }
+
+    .success-message {
+      background: #48bb78;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 500;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        padding: 15px 20px;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .main-content {
+        padding: 20px 15px;
+      }
+
+      .jobs-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tabs {
+        flex-direction: column;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+      }
+
+      .action-btn {
+        min-width: auto;
+      }
+
+      .table-header,
+      .table-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="header">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="24" fill="#667eea" />
+          <path d="M14 18h20v3h-20v-3zm0 6h20v3h-20v-3zm0 6h15v3h-15v-3z" fill="white" />
+          <circle cx="32" cy="16" r="6" fill="#48bb78" />
+          <path d="M30 16l1.5 1.5 3-3" stroke="white" stroke-width="1.5" fill="none" />
+        </svg>
+        <span class="logo-text">HIRELY</span>
+      </div>
+      <div class="user-info">
+        <!-- כאן אנחנו מציגים את האימייל מהשרת -->
+        <span class="user-name">שלום, {{ user_email }}</span>
+        <button class="logout-btn" onclick="window.location.href='/logout'">התנתק</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="success-message" id="successMessage">
+        הפעולה בוצעה בהצלחה!
+      </div>
+
+      <h1 class="page-title" id="dashboardTitle">דשבורד מנהל מגייס</h1>
+
+      <div class="tabs-container">
+        <div class="tabs">
+          <button class="tab active" onclick="showTab('openJobs', event)">
+            <span id="openJobsTitle">משרות פתוחות</span>
+          </button>
+          <button class="tab" onclick="showTab('addJob', event)">
+            <span id="addJobTitle">הוספת משרה חדשה</span>
+          </button>
+          <button class="tab" onclick="showTab('jobHistory', event)">
+            <span id="jobHistoryTitle">היסטוריית משרות</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- טאבים -->
+
+      <!-- Open Jobs Tab -->
+      <div id="openJobsTab" class="tab-content active">
+        <div class="jobs-grid" id="jobsGrid">
+          <!-- נוצר ב-JS -->
+        </div>
+        <div id="candidatesList" class="candidates-list" style="display: none;">
+          <!-- נוצר ב-JS -->
+        </div>
+      </div>
+
+      <!-- Add Job Tab -->
+      <div id="addJobTab" class="tab-content">
+        <div class="job-form">
+          <form id="jobForm" onsubmit="submitJob(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">שם המשרה *</label>
+                <input type="text" class="form-input" id="jobName" required placeholder="לדוגמה: מפתח Full Stack">
+              </div>
+              <div class="form-group">
+                <label class="form-label">מיקום *</label>
+                <select class="form-select" id="jobLocation" required>
+                  <option value="">בחר מיקום</option>
+                  <option value="תל אביב">תל אביב</option>
+                  <option value="ירושלים">ירושלים</option>
+                  <option value="חיפה">חיפה</option>
+                  <option value="באר שבע">באר שבע</option>
+                  <option value="רמת גן">רמת גן</option>
+                  <option value="פתח תקווה">פתח תקווה</option>
+                  <option value="עבודה מהבית">עבודה מהבית</option>
+                  <option value="היברידי">היברידי</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">סוג משרה</label>
+                <select class="form-select" id="jobType">
+                  <option value="משרה מלאה">משרה מלאה</option>
+                  <option value="משרה חלקית">משרה חלקית</option>
+                  <option value="פרילנס">פרילנס</option>
+                  <option value="התמחות">התמחות</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">רמת ניסיון</label>
+                <select class="form-select" id="experienceLevel">
+                  <option value="ללא ניסיון">ללא ניסיון</option>
+                  <option value="1-2 שנים">1-2 שנים</option>
+                  <option value="3-5 שנים">3-5 שנים</option>
+                  <option value="5+ שנים">5+ שנים</option>
+                  <option value="בכיר">בכיר</option>
+                </select>
+              </div>
+              <div class="form-group full-width">
+                <label class="form-label">תיאור המשרה *</label>
+                <textarea class="form-textarea" id="jobDescription" required
+                          placeholder="תאר את המשרה, התפקיד והאחריות..."></textarea>
+              </div>
+              <div class="form-group full-width">
+                <label class="form-label">דרישות המשרה *</label>
+                <textarea class="form-textarea" id="jobRequirements" required
+                          placeholder="פרט את הדרישות הטכניות, השכלה, כישורים נדרשים..."></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">טווח שכר (אופציונלי)</label>
+                <input type="text" class="form-input" id="salaryRange" placeholder="לדוגמה: 15,000-20,000 ₪">
+              </div>
+              <div class="form-group">
+                <label class="form-label">תאריך סגירה משוער</label>
+                <input type="date" class="form-input" id="closingDate">
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" id="submitJobBtn">שלח משרה</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Job History Tab -->
+      <div id="jobHistoryTab" class="tab-content">
+        <div class="history-table">
+          <div class="table-header">
+            <div>שם המשרה</div>
+            <div>תאריך פתיחה</div>
+            <div>מועמדים</div>
+            <div>התקבלו</div>
+            <div>סטטוס</div>
+          </div>
+          <div class="table-row">
+            <div>
+              <div style="font-weight: 600; color: #1a202c;">מפתח Backend Senior</div>
+              <div style="color: #4a5568; font-size: 12px;">תל אביב</div>
+            </div>
+            <div style="color: #4a5568;">15/12/2023</div>
+            <div style="font-weight: 600;">28</div>
+            <div style="color: #48bb78; font-weight: 600;">2</div>
+            <div>
+              <span style="background: #c6f6d5; color: #22543d; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                סגורה
+              </span>
+            </div>
+          </div>
+          <div class="table-row">
+            <div>
+              <div style="font-weight: 600; color: #1a202c;">מעצב UX/UI</div>
+              <div style="color: #4a5568; font-size: 12px;">רמת גן</div>
+            </div>
+            <div style="color: #4a5568;">08/01/2024</div>
+            <div style="font-weight: 600;">19</div>
+            <div style="color: #48bb78; font-weight: 600;">1</div>
+            <div>
+              <span style="background: #c6f6d5; color: #22543d; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                סגורה
+              </span>
+            </div>
+          </div>
+          <div class="table-row">
+            <div>
+              <div style="font-weight: 600; color: #1a202c;">מנהל פרודקט</div>
+              <div style="color: #4a5568; font-size: 12px;">היברידי</div>
+            </div>
+            <div style="color: #4a5568;">22/01/2024</div>
+            <div style="font-weight: 600;">12</div>
+            <div style="color: #ed8936; font-weight: 600;">0</div>
+            <div>
+              <span style="background: #feebc8; color: #744210; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                פעילה
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // נתונים לדמו – בינתיים בצד לקוח, אח"כ נחליף ל-API מהבק
+    const jobsData = [
+      {
+        id: 1,
+        title: "מפתח Full Stack",
+        location: "תל אביב",
+        openDate: "2024-01-15",
+        approvedCandidates: 5
+      },
+      {
+        id: 2,
+        title: "מנהל פרויקטים",
+        location: "חיפה",
+        openDate: "2024-01-10",
+        approvedCandidates: 3
+      },
+      {
+        id: 3,
+        title: "מעצב UX/UI",
+        location: "ירושלים",
+        openDate: "2024-01-20",
+        approvedCandidates: 7
+      }
+    ];
+
+    const candidatesData = {
+      1: [
+        {
+          id: 101,
+          name: "דני לוי",
+          description: "מפתח Full Stack עם 5 שנות ניסיון בפיתוח אפליקציות web מתקדמות",
+          recruiterNote: "מועמד מצוין עם ניסיון רלוונטי ב-React ו-Node.js. המלצה חזקה לראיון.",
+          status: "approved"
+        },
+        {
+          id: 102,
+          name: "מיכל כהן",
+          description: "מפתחת בכירה עם ניסיון רב בטכנולוגיות Microsoft ו-Angular",
+          recruiterNote: "פרופיל חזק מאוד, ניסיון בהובלת צוותים. מתאימה למשרות בכירות.",
+          status: "phone"
+        },
+        {
+          id: 103,
+          name: "יוסי אברהם",
+          description: "מפתח צעיר ומוכשר עם ניסיון בפיתוח אפליקציות מודרניות",
+          recruiterNote: "מועמד מבטיח עם כישורים טכניים טובים. מומלץ לראיון טכני.",
+          status: "interview"
+        }
+      ],
+      2: [
+        {
+          id: 201,
+          name: "שרה רוזן",
+          description: "מנהלת פרויקטים עם 8 שנות ניסיון בחברות הייטק",
+          recruiterNote: "ניסיון מרשים בניהול פרויקטים מורכבים. מתאימה מאוד לתפקיד.",
+          status: "approved"
+        },
+        {
+          id: 202,
+          name: "אבי דוד",
+          description: "מנהל פרויקטים עם רקע טכני חזק ו-PMP",
+          recruiterNote: "שילוב מעולה של כישורי ניהול וידע טכני. המלצה גבוהה.",
+          status: "accepted"
+        }
+      ]
+    };
+
+    let currentJobId = null;
+
+    function showTab(tabName, event) {
+      const tabContents = document.querySelectorAll('.tab-content');
+      tabContents.forEach(c => c.classList.remove('active'));
+
+      const tabs = document.querySelectorAll('.tab');
+      tabs.forEach(t => t.classList.remove('active'));
+
+      document.getElementById(tabName + 'Tab').classList.add('active');
+      event.target.closest('.tab').classList.add('active');
+
+      if (tabName === 'openJobs') {
+        showJobsList();
+      }
+    }
+
+    function renderJobs() {
+      const jobsGrid = document.getElementById('jobsGrid');
+      jobsGrid.innerHTML = '';
+
+      jobsData.forEach(job => {
+        const jobCard = document.createElement('div');
+        jobCard.className = 'job-card';
+        jobCard.onclick = () => showJobCandidates(job.id);
+
+        jobCard.innerHTML = `
+          <div class="job-title">${job.title}</div>
+          <div class="job-details">
+            <div class="job-detail">
+              <span>📍</span>
+              <span>${job.location}</span>
+            </div>
+            <div class="job-detail">
+              <span>📅</span>
+              <span>נפתח: ${formatDate(job.openDate)}</span>
+            </div>
+          </div>
+          <div class="candidates-info">
+            <span class="candidates-count">${job.approvedCandidates} מועמדים מאושרים</span>
+            <span class="approved-badge">מאושר</span>
+          </div>
+        `;
+        jobsGrid.appendChild(jobCard);
+      });
+    }
+
+    function showJobCandidates(jobId) {
+      currentJobId = jobId;
+      const candidates = candidatesData[jobId] || [];
+
+      document.getElementById('jobsGrid').style.display = 'none';
+      document.getElementById('candidatesList').style.display = 'block';
+
+      renderCandidates(candidates);
+    }
+
+    function showJobsList() {
+      document.getElementById('jobsGrid').style.display = 'grid';
+      document.getElementById('candidatesList').style.display = 'none';
+      currentJobId = null;
+    }
+
+    function renderCandidates(candidates) {
+      const candidatesList = document.getElementById('candidatesList');
+      candidatesList.innerHTML = `
+        <div style="margin-bottom: 20px;">
+          <button onclick="showJobsList()" style="background: #718096; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+            ← חזרה לרשימת משרות
+          </button>
+        </div>
+      `;
+
+      candidates.forEach(candidate => {
+        const candidateCard = document.createElement('div');
+        candidateCard.className = 'candidate-card';
+
+        const statusText = getStatusText(candidate.status);
+        const statusClass = `status-${candidate.status}`;
+
+        candidateCard.innerHTML = `
+          <div class="candidate-header">
+            <span class="candidate-name">${candidate.name}</span>
+            <span class="candidate-status ${statusClass}">${statusText}</span>
+          </div>
+          <div class="candidate-info">
+            <div class="candidate-description">${candidate.description}</div>
+            <div class="recruiter-note">
+              <div class="note-label">הערת המגייס:</div>
+              <div class="note-text">${candidate.recruiterNote}</div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button class="action-btn btn-phone" onclick="updateCandidateStatus(${candidate.id}, 'phone')">שיחת טלפון</button>
+            <button class="action-btn btn-interview" onclick="updateCandidateStatus(${candidate.id}, 'interview')">ראיון</button>
+            <button class="action-btn btn-accept" onclick="updateCandidateStatus(${candidate.id}, 'accepted')">קבלה</button>
+            <button class="action-btn btn-reject" onclick="updateCandidateStatus(${candidate.id}, 'rejected')">דחייה</button>
+          </div>
+        `;
+        candidatesList.appendChild(candidateCard);
+      });
+    }
+
+    function getStatusText(status) {
+      const statusMap = {
+        'approved': 'מאושר',
+        'phone': 'שיחת טלפון',
+        'interview': 'ראיון',
+        'accepted': 'התקבל',
+        'rejected': 'נדחה'
+      };
+      return statusMap[status] || 'לא ידוע';
+    }
+
+    function updateCandidateStatus(candidateId, newStatus) {
+      const candidates = candidatesData[currentJobId];
+      const candidate = candidates.find(c => c.id === candidateId);
+
+      if (candidate) {
+        candidate.status = newStatus;
+        const statusText = getStatusText(newStatus);
+        showMessage(`סטטוס ${candidate.name} עודכן ל: ${statusText}`);
+        renderCandidates(candidates);
+      }
+    }
+
+    function submitJob(event) {
+      event.preventDefault();
+
+      const jobData = {
+        name: document.getElementById('jobName').value,
+        location: document.getElementById('jobLocation').value,
+        type: document.getElementById('jobType').value,
+        experience: document.getElementById('experienceLevel').value,
+        description: document.getElementById('jobDescription').value,
+        requirements: document.getElementById('jobRequirements').value,
+        salary: document.getElementById('salaryRange').value,
+        closingDate: document.getElementById('closingDate').value
+      };
+
+      // כרגע זה רק ב-frontend. בהמשך נעשה fetch ל-API בפייתון שישמור DB.
+      const newJob = {
+        id: jobsData.length + 1,
+        title: jobData.name,
+        location: jobData.location,
+        openDate: new Date().toISOString().split('T')[0],
+        approvedCandidates: 0
+      };
+
+      jobsData.push(newJob);
+      candidatesData[newJob.id] = [];
+
+      showMessage('המשרה נשלחה בהצלחה! עודכן אוטומטית אצל HR Manager והמגייסים');
+
+      document.getElementById('jobForm').reset();
+
+      setTimeout(() => {
+        showTab('openJobs', { target: document.querySelector('.tabs .tab') });
+        renderJobs();
+      }, 1500);
+    }
+
+    function showMessage(message) {
+      const successMessage = document.getElementById('successMessage');
+      successMessage.textContent = message;
+      successMessage.classList.add('show');
+      setTimeout(() => {
+        successMessage.classList.remove('show');
+      }, 3000);
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('he-IL');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      renderJobs();
+    });
+  </script>
+</body>
+</html>

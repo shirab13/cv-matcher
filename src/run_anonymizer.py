@@ -1,4 +1,4 @@
-from anonymizer import anonymize_docx_file, anonymize_pdf_file
+from src.anonymizer import anonymize_docx_file, anonymize_pdf_file
 from pathlib import Path
 import pytesseract
 import os

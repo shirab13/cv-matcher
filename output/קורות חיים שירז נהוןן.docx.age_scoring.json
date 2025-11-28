@@ -1,7 +1,7 @@
 {
-  "file": "output\\10.docx",
-  "birth_year": 1989,
-  "age": 36,
+  "file": "output\\קורות חיים שירז נהוןן.docx",
+  "birth_year": 2001,
+  "age": 24,
   "age_score_points": 10.0,
   "age_penalty": {
     "penalized": false,
@@ -9,6 +9,6 @@
   },
   "raw_penalized_0_100": 100.0,
   "final_score": 10.0,
-  "reason": "range_minus_18",
+  "reason": "explicit_year",
   "year_now": 2025
 }

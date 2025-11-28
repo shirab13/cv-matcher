@@ -1,7 +1,7 @@
 {
-  "file": "output\\10.docx",
-  "birth_year": 1989,
-  "age": 36,
+  "file": "output\\אסנת.pdf",
+  "birth_year": 1990,
+  "age": 35,
   "age_score_points": 10.0,
   "age_penalty": {
     "penalized": false,

@@ -1,0 +1,14 @@
+{
+  "file": "output\\קורות חיים אלנה מאירוביץ.docx",
+  "birth_year": 1972,
+  "age": 53,
+  "age_score_points": 0.0,
+  "age_penalty": {
+    "penalized": true,
+    "factor": 0.9
+  },
+  "raw_penalized_0_100": 90.0,
+  "final_score": 0.0,
+  "reason": "explicit_year",
+  "year_now": 2025
+}

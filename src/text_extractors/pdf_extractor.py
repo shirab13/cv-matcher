@@ -3,7 +3,7 @@ import fitz  # PyMuPDF
 from src.text_extractors.ocr_extractor import extract_text_by_ocr
 
 def extract_text_from_pdf(path: str) -> Optional[str]:
-    # 1) מנסה קודם טקסט חיובית (לא סרוק)
+    """Extract text from PDF; if weak/empty -> try OCR fallback."""
     try:
         doc = fitz.open(path)
     except Exception:
@@ -22,11 +22,9 @@ def extract_text_from_pdf(path: str) -> Optional[str]:
         doc.close()
         text = "\n".join(parts).strip()
 
-    # אם חילוץ טקסט לא החזיר כמעט כלום — ננסה OCR
+    # OCR fallback אם הטקסט דל
     if not text or len(text.replace("\n", " ").strip()) < 40:
-        # העדפת שפות ל-OCR: אם התקנת "heb", שימי heb קודם; אחרת אפשר ["eng"]
-        lang_order = ["heb", "eng"]
-        text_ocr = extract_text_by_ocr(path, lang_order=lang_order)
+        text_ocr = extract_text_by_ocr(path, lang_order=["heb","eng"])
         if text_ocr:
             return text_ocr
 

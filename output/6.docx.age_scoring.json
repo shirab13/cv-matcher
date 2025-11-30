@@ -1,7 +1,7 @@
 {
-  "file": "output\\10.docx",
-  "birth_year": 1989,
-  "age": 36,
+  "file": "output\\6.docx",
+  "birth_year": 1998,
+  "age": 27,
   "age_score_points": 10.0,
   "age_penalty": {
     "penalized": false,

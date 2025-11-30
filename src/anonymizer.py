@@ -6,8 +6,8 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # <<< נתיבי קלט/פלט >>>  ---- עדכני לפי הצורך ----
-INPUT_DIR  = '/content/drive/MyDrive/CV/all'
-OUTPUT_DIR = '/content/drive/MyDrive/CV_all_fina1_ocr'
+INPUT_DIR  = r'C:\Users\shira\OneDrive\Desktop\cv-matcher\input'
+OUTPUT_DIR = r'C:\Users\shira\OneDrive\Desktop\cv-matcher\output'
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # ===== תבניות ערכים =====
@@ -276,20 +276,25 @@ EMAIL_VAL_PDF = EMAIL_VAL_TXT
 URL_VAL_PDF   = URL_VAL_TXT
 
 # --- מיזוג מלבנים לפי שורה (מונע "מחיקה של כל הדף") ---
-def _merge_overlapping_rects_linewise(rects, y_tol=6):
-    """ממזג רק מלבנים שחופפים משמעותית באותו קו טקסט (y-mid קרוב).
-       לא ממזג שורות שונות כדי למנוע איחוד-על."""
-    rects = [fitz.Rect(r) for r in rects]
-    if not rects: return []
-    # מסדרים לפי מרכז Y
-    def y_mid(r): return (r.y0 + r.y1)/2
+def _merge_overlapping_rects_linewise(rects, y_tol=2.0, x_gap_tol=1.5):
+    """ממזג רק מלבנים הנמצאים באותה שורה (y-mid קרוב) ובעלי חפיפה/מגע אופקי קטן.
+       y_tol מוקטן כדי למנוע איחוד בין שורות סמוכות, ומוגבל פער X בין מלבנים."""
+    rects = [fitz.Rect(r) for r in rects if r is not None]
+    if not rects:
+        return []
+
+    def y_mid(r): return (r.y0 + r.y1) / 2.0
+
+    # דלי שורות לפי מרכז-Y
     buckets = []
     for r in sorted(rects, key=y_mid):
         placed = False
         for b in buckets:
             if abs(y_mid(b[0]) - y_mid(r)) <= y_tol:
                 b.append(r); placed = True; break
-        if not placed: buckets.append([r])
+        if not placed:
+            buckets.append([r])
+
     merged = []
     for bucket in buckets:
         bucket.sort(key=lambda rr: (rr.x0, rr.x1))
@@ -298,13 +303,16 @@ def _merge_overlapping_rects_linewise(rects, y_tol=6):
             if not out:
                 out.append(r); continue
             last = out[-1]
-            # מאחד אם יש חפיפה/מגע קטן אופקי ושייכות לשורה
-            if r.x0 <= last.x1 + 2 and r.y1 >= last.y0 - y_tol and r.y0 <= last.y1 + y_tol:
+            same_line = (abs(y_mid(last) - y_mid(r)) <= y_tol)
+            # מאחד רק אם יש חפיפה/מגע קטן מאוד וגם לא קופצים רחוק ב-X
+            if same_line and (r.x0 <= last.x1 + x_gap_tol):
                 out[-1] = last | r
             else:
                 out.append(r)
         merged.extend(out)
+
     return merged
+
 
 def _words(page):
     ws = page.get_text("words")
@@ -364,22 +372,35 @@ def _probable_he_name_line(s: str) -> bool:
     bad = {'קורות','חיים','פרטים','אישיים','ניסיון','השכלה','מיומנויות','כישורים','שפות','תקציר','סיכום','מטרה','הסמכות','תעודות'}
     return 2 <= len(words) <= 4 and not any(w in bad for w in words)
 
+
 def _redact_probable_name_title(page):
     blocks = page.get_text("blocks") or []
-    if not blocks: return 0
+    if not blocks:
+        return 0
+
+    # מיון בלוקים לפי מיקום – לוקחים את הבלוקים העליונים
     blocks.sort(key=lambda b: (b[1], b[0]))
-    done = 0
-    for (x0,y0,x1,y1,txt,*_) in blocks[:5]:
-        if not txt: continue
-        for line in [l.strip() for l in txt.split('\n') if _clean(l)]:
+    hits = 0
+
+    for (x0, y0, x1, y1, txt, *_) in blocks[:5]:
+        if not txt:
+            continue
+        lines = [l.strip() for l in txt.split('\n') if _clean(l)]
+        for line in lines:
             if _probable_he_name_line(line):
                 for r in page.search_for(line):
-                    page.add_redact_annot(r, text=REPL, fill=(1,1,1)); done += 1
-                if done: return done
-    return done
+                    rr = _shrink_rect(fitz.Rect(r))
+                    page.add_redact_annot(rr, text=REPL, fill=(1,1,1))
+                    hits += 1
+                # מספיק שנעלמנו את שורת השם הראשונה
+                return hits
+
+    return hits
+
+
 
 # --- שם ככותרת לפי גודל פונטים (top of page) ---
-def _redact_big_font_name_spans(page, top_ratio=0.35, min_font=18, max_words=4):
+def _redact_big_font_name_spans(page, top_ratio=0.40, min_font=16, max_words=4):
     info = page.get_text("dict") or {}
     page_h = page.rect.height
     hits = 0
@@ -388,15 +409,17 @@ def _redact_big_font_name_spans(page, top_ratio=0.35, min_font=18, max_words=4):
             for span in line.get("spans", []):
                 text = _clean(span.get("text", ""))
                 size = span.get("size", 0)
-                bbox  = fitz.Rect(span.get("bbox", page.rect))
+                bbox = fitz.Rect(span.get("bbox", page.rect))
                 if bbox.y1 > page_h * top_ratio:
                     continue
                 if size >= min_font and re.fullmatch(r'[א-ת\s]{2,}', text or ''):
                     words = [w for w in re.sub(r'\s+', ' ', text).split(' ') if w]
                     if 2 <= len(words) <= max_words and not any(w in SECTION_WORDS for w in words):
-                        page.add_redact_annot(bbox, text=REPL, fill=(1,1,1))
+                        rr = _shrink_rect(bbox, 0.8, 0.8)
+                        page.add_redact_annot(rr, text=REPL, fill=(1,1,1))
                         hits += 1
     return hits
+
 
 # ===== OCR =====
 import pytesseract
@@ -430,17 +453,34 @@ def _rect_union_ocr(ws, i_from, i_to):
         r |= fitz.Rect(ws[k]['x0'], ws[k]['y0'], ws[k]['x1'], ws[k]['y1'])
     return r
 
+def _shrink_rect(r: fitz.Rect, px=0.6, py=0.6) -> fitz.Rect:
+    # מונע “נגיסה” בטקסט סמוך בגלל bounding קצת גדול מדי
+    return fitz.Rect(r.x0 + px, r.y0 + py, r.x1 - px, r.y1 - py)
+
 def _ocr_find_token_windows(page, regex, max_tokens=8, zoom=3.0):
     ws = _ocr_words(page, zoom=zoom)
     rects = []
     n = len(ws)
-    for i in range(n):
-        for j in range(i, min(n, i+max_tokens)):
-            s0 = ''.join(ws[k]['text'] for k in range(i, j+1))
-            s1 = ' '.join(ws[k]['text'] for k in range(i, j+1))
-            if regex.search(s0) or regex.search(s1):
-                rects.append(_rect_union_ocr(ws, i, j)); break
+    if not n:
+        return rects
+
+    # קיבוץ לפי שורות OCR גסות
+    def line_key(w): return round(w['y0'], 1)
+    lines = {}
+    for w in ws:
+        lines.setdefault(line_key(w), []).append(w)
+    for key in lines:
+        line = sorted(lines[key], key=lambda z: z['x0'])
+        m = len(line)
+        for i in range(m):
+            for j in range(i, min(m, i + max_tokens)):
+                s0 = ''.join(line[k]['text'] for k in range(i, j+1))
+                s1 = ' '.join(line[k]['text'] for k in range(i, j+1))
+                if regex.search(s0) or regex.search(s1):
+                    rects.append(_rect_union_ocr(line, i, j))
+                    break
     return rects
+
 
 def _ocr_redact_probable_name_title(page, zoom=3.0):
     ws = _ocr_words(page, zoom=zoom)
@@ -503,20 +543,27 @@ def _ocr_birthdate_to_year_rects(page, zoom=3.0):
 
 # --- CAP בטיחות: לא נמרח על כל הדף ---
 def _safe_apply_redactions(page, added_rects, cover_limit=0.70):
-    """מונע מצב שמלבני המחיקה מכסים >70% מהעמוד"""
     if not added_rects:
         return
-    # מאחדים לבאונדרי אחד (Bounding Box) – זה שמרני אבל בטוח
     union = None
     for r in added_rects:
         union = r if union is None else (union | r)
-    # חישוב שטח בלי get_area (תואם לכל גרסאות PyMuPDF)
+
     page_area  = float(page.rect.width) * float(page.rect.height)
     union_area = float(union.width) * float(union.height) if union else 0.0
-    # אם הבנאונדינג מכסה מעל הסף – אל תיישם מחיקות (מונע "עמוד ריק")
+
     if page_area > 0 and (union_area / page_area) > cover_limit:
+        # ביטול ההערות כדי שלא יישארו מסגרות
+        try:
+            for annot in list(page.annots() or []):
+                if annot.type[0] == 20:  # redact
+                    annot.delete()
+        except Exception:
+            pass
         return
-    page.apply_redactions()
+
+    page.apply_redactions()  # אחרי זה אין מסגרות אדומות
+
 
 
 
@@ -565,7 +612,9 @@ def anonymize_pdf_file(path_in: str, path_out: str):
 
             rects_all = _merge_overlapping_rects_linewise(rects_token_emails + rects_token_urls + rects_token_phone + rects_token_id)
             for r in rects_all:
-                page.add_redact_annot(r, text=REPL, fill=(1,1,1))
+                rr = _shrink_rect(fitz.Rect(r))
+                page.add_redact_annot(rr, text="[Confidential]", fill=(1,1,1))
+                added_rects.append(rr)
                 added_rects.append(r)
             _safe_apply_redactions(page, added_rects)
 
@@ -608,7 +657,9 @@ def anonymize_pdf_file(path_in: str, path_out: str):
                 if len(year) == 2: year = _yy2yyyy(year)
                 try:
                     for r in page.search_for(full_date):
-                        page.add_redact_annot(r, text=year, fill=(1,1,1)); added_rects.append(r); inline_birth_replaced += 1
+                        rr = _shrink_rect(fitz.Rect(r))
+                        page.add_redact_annot(rr, text=year, fill=(1,1,1))
+                        added_rects.append(rr)
                 except Exception:
                     pass
 
@@ -626,7 +677,9 @@ def anonymize_pdf_file(path_in: str, path_out: str):
                 if len(year) == 2: year = _yy2yyyy(year)
                 try:
                     for r in page.search_for(full_date):
-                        page.add_redact_annot(r, text=year, fill=(1,1,1)); added_rects.append(r); nearby_birth_replaced += 1
+                        rr = _shrink_rect(fitz.Rect(r))
+                        page.add_redact_annot(rr, text=year, fill=(1,1,1))
+                        added_rects.append(rr)
                 except Exception:
                     pass
 
@@ -645,20 +698,28 @@ def anonymize_pdf_file(path_in: str, path_out: str):
             TOKEN_EMAIL_RE = re.compile(EMAIL_VAL_TXT, re.IGNORECASE)
             TOKEN_URL_RE   = re.compile(URL_VAL_TXT,   re.IGNORECASE)
             def _token_rects(page, regex, max_tokens):
-                ws = _words(page); n=len(ws); rects=[]
+                ws = _words(page)
+                n = len(ws)
+                rects = []
                 for i in range(n):
-                    for j in range(i, min(n, i+max_tokens)):
-                        s0=''.join(ws[k][4] for k in range(i,j+1))
-                        s1=' '.join(ws[k][4] for k in range(i,j+1))
+                    base_line = ws[i][6]  # line number
+                    for j in range(i, min(n, i + max_tokens)):
+                        if ws[j][6] != base_line:
+                            break  # אל תחצה שורה
+                        s0 = ''.join(ws[k][4] for k in range(i, j + 1))
+                        s1 = ' '.join(ws[k][4] for k in range(i, j + 1))
                         if regex.search(s0) or regex.search(s1):
-                            rects.append(_rect_union(ws,i,j)); break
+                            rects.append(_rect_union(ws, i, j))
+                            break
                 return rects
             rects_token_emails = _token_rects(page, TOKEN_EMAIL_RE, 8)
             rects_token_urls   = _token_rects(page, TOKEN_URL_RE, 10)
 
             rects_all = _merge_overlapping_rects_linewise(rects_simple + rects_name + rects_token_emails + rects_token_urls)
             for r in rects_all:
-                page.add_redact_annot(r, text=REPL, fill=(1,1,1)); added_rects.append(r)
+                    rr = _shrink_rect(fitz.Rect(r))
+                    page.add_redact_annot(rr, text="[Confidential]", fill=(1,1,1))
+                    added_rects.append(rr)
 
             _safe_apply_redactions(page, added_rects)
 
@@ -699,50 +760,3 @@ def make_unique_outpath(in_path: str, input_root: str, output_root: str) -> str:
     hshort = hashlib.sha1(rel_key.encode('utf-8')).hexdigest()[:8]
     return str(Path(output_root) / f"{p_in.stem}__ANON__{hshort}{p_in.suffix.lower()}")
 
-# ===== ריצה =====
-all_found = discover_all_files(INPUT_DIR)
-print(f'נמצאו בקלט (רקורסיבי): {len(all_found)} קבצים')
-
-# המרות מראש
-to_convert = [p for p in all_found if Path(p).suffix.lower() in CONVERTABLE_EXTS]
-converted_map = {}
-for src in to_convert:
-    outp = libreoffice_convert(src, 'docx')
-    if outp:
-        converted_map[src] = outp
-        print(f'Converted -> {outp}')
-    else:
-        print(f'FAILED convert: {src}')
-
-# רשימת קלט סופית
-final_inputs = []
-for p in all_found:
-    if Path(p).suffix.lower() in SUPPORTED_FINAL:
-        final_inputs.append(p)
-final_inputs.extend(converted_map.values())
-final_inputs = list(dict.fromkeys(final_inputs))
-
-print(f'לקבצים לעיבוד (PDF/DOCX): {len(final_inputs)}')
-
-processed_ok, processed_fail = [], []
-
-for in_path in final_inputs:
-    ext = Path(in_path).suffix.lower()
-    out_path = make_unique_outpath(in_path, INPUT_DIR, OUTPUT_DIR)
-    try:
-        if ext == '.docx':
-            print('Processing DOCX:', Path(in_path).name, '->', Path(out_path).name)
-            anonymize_docx_file(in_path, out_path)
-        else:
-            print('Processing PDF:', Path(in_path).name, '->', Path(out_path).name)
-            anonymize_pdf_file(in_path, out_path)
-        processed_ok.append((in_path, out_path))
-    except Exception as e:
-        processed_fail.append(in_path)
-        print(f'FAILED: {Path(in_path).name} | {type(e).__name__}: {e}')
-
-print('\n===== SUMMARY =====')
-print(f'סה״כ נמצאו (כל הסוגים): {len(all_found)}')
-print(f'ניסיונות המרה: {len(to_convert)} | הומרו בהצלחה: {len(converted_map)}')
-print(f'עברו עיבוד (נשמרו ב-{OUTPUT_DIR}): {len(processed_ok)}')
-print(f'נכשלו בעיבוד: {len(processed_fail)}')

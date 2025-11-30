@@ -12,7 +12,7 @@ from flask import (
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
-DB_PATH = "users.db"
+DB_PATH = "cv_matcher.db"
 
 app = Flask(__name__)
 app.secret_key = "dev-secret-change-me"   # להחליף בסוד אמיתי בפרודקשן
@@ -190,9 +190,7 @@ def login():
 # ----------------- MAIN -----------------
 
 if __name__ == "__main__":
-    if not os.path.exists(DB_PATH):
-        init_db()
-    else:
-        print("📂 משתמש בקובץ DB קיים:", DB_PATH)
+    init_db()
 
+    print("📂 משתמש בקובץ DB:", DB_PATH)
     app.run(host="127.0.0.1", port=5000, debug=True)

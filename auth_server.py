@@ -25,7 +25,78 @@ CORS(app)
 def index():
     # דף ההתחברות – templates/login.html
     return render_template("login.html")
+# -----------------קליטת משרה חדשה-----------------
 
+@app.route("/api/jobs", methods=["POST"])
+def create_job():
+    """
+    יצירת משרה חדשה ב־DB.
+    שדות חובה:
+      - title
+      - description
+      - must_requirements
+    שדות אופציונליים:
+      - nice_to_have_requirements
+      - location
+      - employment_type
+    """
+    data = request.get_json() or {}
+
+    title = (data.get("title") or "").strip()
+    description = (data.get("description") or "").strip()
+    must_req = (data.get("must_requirements") or "").strip()
+    nice_req = (data.get("nice_to_have_requirements") or "").strip() or None
+    location = (data.get("location") or "").strip() or None
+    employment_type = (data.get("employment_type") or "").strip() or None
+
+    # ולידציה בסיסית
+    if not title or not description or not must_req:
+        return jsonify({
+            "success": False,
+            "message": "חובה למלא שם משרה, תיאור ודרישות חובה"
+        }), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO jobs (
+            title, description, must_requirements,
+            nice_to_have_requirements, location, employment_type
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (title, description, must_req, nice_req, location, employment_type),
+    )
+    job_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "המשרה נוצרה בהצלחה",
+        "job_id": job_id
+    }), 201
+# -----------------רשימת משרות קיימות-----------------
+@app.route("/api/jobs", methods=["GET"])
+def list_jobs():
+    """
+    מחזיר רשימת משרות פעילות (id + title) ל־dropdown בצד פרונט.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, title FROM jobs WHERE is_active = 1 ORDER BY created_at DESC"
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    jobs = [
+        {"id": row["id"], "title": row["title"]}
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "jobs": jobs})
 
 # ----------------- דשבורדים לפי תפקיד -----------------
 
@@ -114,7 +185,22 @@ def init_db():
         )
         """
     )
-
+ # ---------- טבלת משרות ----------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,                    -- שם משרה
+            description TEXT NOT NULL,              -- תיאור חופשי
+            must_requirements TEXT NOT NULL,        -- דרישות חובה
+            nice_to_have_requirements TEXT,         -- דרישות יתרון (לא חובה)
+            location TEXT,                          -- מיקום (אופציונלי)
+            employment_type TEXT,                   -- סוג משרה (פול טיים/פרילנס וכו')
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            is_active INTEGER NOT NULL DEFAULT 1    -- 1=פעיל, 0=סגור
+        )
+        """
+    )
     # 4 משתמשי דמו
     demo_users = [
         ("hr_manager@example.com", "123456", "HR_MANAGER"),
@@ -134,7 +220,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("✅ DB Ready – users.db נוצר (אם לא היה) ונטענו 4 משתמשי דמו.")
+    print("✅ DB Ready – cv_matcher.db מוכן (users + jobs)")
 
 
 # ----------------- LOGIN API -----------------

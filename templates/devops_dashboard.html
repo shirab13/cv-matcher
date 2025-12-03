@@ -582,7 +582,7 @@
       <button class="logout-btn" onclick="window.location.href='/logout'">
        התנתק
       </button>
-    </div>
+  </div>
 
    </header>
    <main class="main-content">
@@ -674,37 +674,47 @@
       font_family: "'Segoe UI', Tahoma, Arial, Helvetica, sans-serif",
       font_size: 16
     };
+    
 
-    // Sample data
-    const userRequests = [
-      {
-        id: 1,
-        name: "דנה שמואל",
-        company: "טכנולוגיות אלפא",
-        position: "מנהלת גיוס",
-        email: "dana.samuel@alpha-tech.co.il",
-        requestDate: "2024-01-25",
-        status: "pending"
-      },
-      {
-        id: 2,
-        name: "יוסי כהן",
-        company: "סטארט-אפ בטא",
-        position: "HR Manager",
-        email: "yossi.cohen@beta-startup.com",
-        requestDate: "2024-01-24",
-        status: "pending"
-      },
-      {
-        id: 3,
-        name: "מיכל לוי",
-        company: "חברת גמא",
-        position: "רכזת גיוס",
-        email: "michal.levy@gamma-corp.co.il",
-        requestDate: "2024-01-23",
-        status: "pending"
-      }
-    ];
+// משתמשי דמו (תמיד נרצה להציג אותם)
+  const demoUserRequests = [
+  {
+    id: 1,
+    name: "דנה שמואל",
+    company: "טכנולוגיות אלפא",
+    position: "מנהלת גיוס",
+    email: "dana.samuel@alpha-tech.co.il",
+    requestDate: "2024-01-25",
+    status: "pending",
+    isDemo: true
+  },
+  {
+    id: 2,
+    name: "יוסי כהן",
+    company: "סטארט-אפ בטא",
+    position: "HR Manager",
+    email: "yossi.cohen@beta-startup.com",
+    requestDate: "2024-01-24",
+    status: "pending",
+    isDemo: true
+  },
+  {
+    id: 3,
+    name: "מיכל לוי",
+    company: "חברת גמא",
+    position: "רכזת גיוס",
+    email: "michal.levy@gamma-corp.co.il",
+    requestDate: "2024-01-23",
+    status: "pending",
+    isDemo: true
+  }
+];
+
+
+
+  // המערך שממנו הרנדר עובד בפועל (דמו + DB)
+  let userRequests = [...demoUserRequests];
+
 
     const jobFeedbacks = [
       {
@@ -927,9 +937,15 @@
             </div>
           </div>
           <div class="action-buttons">
-            <button class="action-btn btn-details" onclick="showUserDetails(${request.id})">${config.view_details_text || defaultConfig.view_details_text}</button>
-            <button class="action-btn btn-approve" onclick="approveUser(${request.id})">${config.approve_text || defaultConfig.approve_text}</button>
-            <button class="action-btn btn-reject" onclick="rejectUser(${request.id})">${config.reject_text || defaultConfig.reject_text}</button>
+            <button class="action-btn btn-details" onclick="showUserDetails('${request.id}')">
+              ${config.view_details_text || defaultConfig.view_details_text}
+            </button>
+            <button class="action-btn btn-approve" onclick="approveUser('${request.id}')">
+              ${config.approve_text || defaultConfig.approve_text}
+            </button>
+            <button class="action-btn btn-reject" onclick="rejectUser('${request.id}')">
+              ${config.reject_text || defaultConfig.reject_text}
+            </button>
           </div>
         `;
         
@@ -990,6 +1006,46 @@
         logContent.appendChild(logEntry);
       });
     }
+    async function loadUserRequests() {
+     // תמיד נתחיל מהדמו
+      userRequests = [...demoUserRequests];
+
+      try {
+        const res = await fetch('/api/admin/pending-users');
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          console.error('שגיאה בטעינת משתמשים מהשרת:', data);
+          renderUserRequests();
+          updateStats();
+          return;
+        }
+
+        const serverRequests = (data.users || []).map(u => ({
+          id: u.id,                 // מזהה מספרי מה־DB
+          name: (u.full_name || u.email.split('@')[0]),
+          company: u.company_name || 'לא צוין',
+          position: u.role || 'HR Manager',
+          email: u.email,
+          requestDate: u.created_at || null,
+          status: 'pending',
+          isDemo: false             // חשוב!
+        }));
+
+
+        // דמו + DB ביחד
+        userRequests = [...demoUserRequests, ...serverRequests];
+
+        renderUserRequests();
+        updateStats();
+      } catch (err) {
+        console.error('שגיאה כללית בטעינת בקשות:', err);
+        userRequests = [...demoUserRequests]; // fallback
+        renderUserRequests();
+        updateStats();
+      }
+    }
+
 
     function getLogTypeText(type) {
       const typeMap = {
@@ -1042,59 +1098,119 @@
       document.getElementById('userModal').classList.remove('show');
     }
 
-    function approveUser(userId) {
-      const user = userRequests.find(u => u.id === userId);
+    async function approveUser(userId) {
+      const user = userRequests.find(u => String(u.id) === String(userId));
       if (!user) return;
 
-      // Generate random credentials
-      const username = user.email.split('@')[0];
-      const password = generatePassword();
-
-      showMessage(`משתמש ${user.name} אושר בהצלחה!<br>נשלח מייל עם פרטי גישה:<br>שם משתמש: ${username}<br>סיסמה: ${password}`);
-      
-      // Add to system log
-      systemLogs.unshift({
-        id: systemLogs.length + 1,
-        message: `אישור משתמש: ${user.email} - נשלח מייל עם פרטי גישה`,
-        timestamp: new Date().toLocaleString('he-IL'),
-        type: "success"
-      });
-
-      // Remove from pending requests
-      const index = userRequests.findIndex(u => u.id === userId);
-      if (index > -1) {
-        userRequests.splice(index, 1);
-        renderUserRequests();
+     // אם זה משתמש דמו – רק אנימציה/הודעה, בלי API
+      if (user.isDemo) {
+        showMessage(`(דמו) משתמש ${user.name} אושר בהצלחה (לצורכי הדגמה בלבד)`);
+        const index = userRequests.findIndex(u => String(u.id) === String(userId));
+        if (index > -1) {
+          userRequests.splice(index, 1);
+          renderUserRequests();
+          updateStats();
+        }
+        return;
       }
 
-      // Update stats
-      updateStats();
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/approve`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          const msg = (data && data.message) || "שגיאה באישור המשתמש";
+          showMessage(msg);
+          return;
+        }
+
+        showMessage(`משתמש ${user.email} אושר בהצלחה!`);
+
+        // להסיר מהרשימה בצד לקוח
+        const index = userRequests.findIndex(u => String(u.id) === String(userId));
+        if (index > -1) {
+          userRequests.splice(index, 1);
+          renderUserRequests();
+          updateStats();
+        }
+
+        // להוסיף ללוג (אופציונלי)
+        systemLogs.unshift({
+          id: systemLogs.length + 1,
+          message: `אישור משתמש: ${user.email}`,
+          timestamp: new Date().toLocaleString('he-IL'),
+          type: "success"
+        });
+        renderSystemLogs();
+
+      } catch (err) {
+        console.error("approveUser error:", err);
+        showMessage("שגיאה בתקשורת עם השרת בעת אישור המשתמש");
+      }
     }
 
-    function rejectUser(userId) {
-      const user = userRequests.find(u => u.id === userId);
+
+    async function rejectUser(userId) {
+      const user = userRequests.find(u => String(u.id) === String(userId));
       if (!user) return;
 
-      showMessage(`בקשת המשתמש ${user.name} נדחתה`);
-      
-      // Add to system log
-      systemLogs.unshift({
-        id: systemLogs.length + 1,
-        message: `דחיית בקשת משתמש: ${user.email}`,
-        timestamp: new Date().toLocaleString('he-IL'),
-        type: "warning"
-      });
-
-      // Remove from pending requests
-      const index = userRequests.findIndex(u => u.id === userId);
-      if (index > -1) {
-        userRequests.splice(index, 1);
-        renderUserRequests();
+  // דמו – בלי     API, רק להעלים ומסר
+      if (user.isDemo) {
+        showMessage(`(דמו) בקשת המשתמש ${user.name} נדחתה (לצורכי הדגמה בלבד)`);
+        const index = userRequests.findIndex(u => String(u.id) === String(userId));
+        if (index > -1) {
+          userRequests.splice(index, 1);
+          renderUserRequests();
+          updateStats();
+        }
+        return;
       }
 
-      // Update stats
-      updateStats();
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/reject`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          const msg = (data && data.message) || "שגיאה בדחיית המשתמש";
+          showMessage(msg);
+          return;
+        }
+
+        showMessage(`בקשת המשתמש ${user.email} נדחתה ונמחקה מהמערכת`);
+
+        const index = userRequests.findIndex(u => String(u.id) === String(userId));
+        if (index > -1) {
+          userRequests.splice(index, 1);
+          renderUserRequests();
+          updateStats();
+        }
+
+        systemLogs.unshift({
+          id: systemLogs.length + 1,
+          message: `דחיית בקשת משתמש: ${user.email}`,
+          timestamp: new Date().toLocaleString('he-IL'),
+          type: "warning"
+        });
+        renderSystemLogs();
+
+      } catch (err) {
+        console.error("rejectUser error:", err);
+        showMessage("שגיאה בתקשורת עם השרת בעת דחיית המשתמש");
+      }
     }
+
 
     function generatePassword() {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -1125,16 +1241,19 @@
     }
 
     function formatDate(dateString) {
+      if (!dateString) return '';   // אם אין תאריך – לא להתרסק
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // אם זה לא פורמט תקין, פשוט להציג כמו שזה
       return date.toLocaleDateString('he-IL');
     }
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-      renderUserRequests();
-      renderJobFeedbacks();
-      renderSystemLogs();
-    });
+  // Initialize
+  document.addEventListener('DOMContentLoaded', function() {
+    loadUserRequests();       // דמו + DB
+    renderJobFeedbacks();
+    renderSystemLogs();
+  });
+
 
     // Close modal when clicking outside
     document.getElementById('userModal').addEventListener('click', function(e) {

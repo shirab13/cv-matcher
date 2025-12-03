@@ -1,12 +1,14 @@
 # auth_server.py
 import os
 import sqlite3
-
+from functools import wraps
+from flask import abort
 import traceback
 from uuid import uuid4
 from pathlib import Path
 from werkzeug.utils import secure_filename
-
+from functools import wraps
+from flask import abort
 # אנונימיזר + upsert לקנדידייט
 from src.anonymizer import anonymize_docx_file, anonymize_pdf_file
 from src.utils.db import upsert_candidate
@@ -62,6 +64,74 @@ def allowed_file(filename: str) -> bool:
 def index():
     # דף ההתחברות – templates/login.html
     return render_template("login.html")
+# ----------------- דף הרשמה -----------------
+
+
+@app.route("/register", methods=["GET"])
+def register_get():
+    """
+    דף הרשמה למנהלי HR – מציג את הטופס.
+    """
+    return render_template("register.html")
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    """
+    API להרשמת מנהל/ת HR חדש/ה.
+    יוצר רשומה בטבלת users עם is_approved=0.
+    """
+    data = request.get_json() or {}
+
+    email = (data.get("email") or "").strip().lower()
+    company_name = (data.get("company_name") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    # ולידציה בסיסית
+    if not email or not company_name or not password:
+        return jsonify({
+            "success": False,
+            "message": "חובה למלא אימייל, שם חברה וסיסמה"
+        }), 400
+
+    if len(password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "הסיסמה חייבת להיות באורך 6 תווים לפחות"
+        }), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # בדיקה אם האימייל כבר קיים
+    cur.execute("SELECT id FROM users WHERE email = ?", (email,))
+    if cur.fetchone() is not None:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "אימייל זה כבר רשום במערכת"
+        }), 400
+
+    # יצירת משתמש חדש ברירת מחדל: HR_MANAGER, is_approved=0
+    password_hash = generate_password_hash(password)
+
+    try:
+        cur.execute(
+            """
+            INSERT INTO users (email, password_hash, role, company_name, is_approved)
+            VALUES (?, ?, ?, ?, 0)
+            """,
+            (email, password_hash, "HR_MANAGER", company_name),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "ההרשמה נקלטה בהצלחה. החשבון יופיע למנהל המערכת לאישור."
+    }), 201
+
+
 # -----------------קליטת משרה חדשה-----------------
 
 @app.route("/api/jobs", methods=["POST"])
@@ -336,6 +406,8 @@ def logout():
     """
     session.clear()
     return redirect("/")
+
+
 # ----------------- העלאת קוח -----------------
 
 @app.route("/api/upload_cv", methods=["POST"])
@@ -469,11 +541,116 @@ def upload_cv():
     }), 201
 
 # ----------------- DB פונקציות -----------------
+# -----------------helper להרשאות DevOps בלבד -----------------
+
+def devops_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
+        if session.get("role") != "DEVOPS":
+            return jsonify({"success": False, "message": "אין לך הרשאה לפעולה הזו"}), 403
+        return f(*args, **kwargs)
+    return wrapper
+# -----------------API: רשימת משתמשים ממתינים לאישור-----------------
+
+@app.route("/api/admin/pending-users", methods=["GET"])
+@devops_required
+def api_pending_users():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, email, company_name, role, is_approved
+        FROM users
+        WHERE is_approved = 0
+        ORDER BY id DESC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+
+    users = [
+        {
+            "id": row["id"],
+            "email": row["email"],
+            "company_name": row["company_name"],
+            "role": row["role"],
+        }
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "users": users})
+# -----------------API: אישור / דחייה -----------------
+
+@app.route("/api/admin/users/<int:user_id>/approve", methods=["POST"])
+@devops_required
+def api_approve_user(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET is_approved = 1 WHERE id = ?", (user_id,))
+    if cur.rowcount == 0:
+        conn.close()
+        return jsonify({"success": False, "message": "משתמש לא נמצא"}), 404
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "המשתמש אושר בהצלחה"})
+
+
+@app.route("/api/admin/users/<int:user_id>/reject", methods=["POST"])
+@devops_required
+def api_reject_user(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    # אפשר למחוק לגמרי, או לסמן כ-rejected עם עמודה נוספת – כרגע נמחק:
+    cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    if cur.rowcount == 0:
+        conn.close()
+        return jsonify({"success": False, "message": "משתמש לא נמצא"}), 404
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "בקשת המשתמש נדחתה ונמחקה"})
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@app.route("/api/admin/pending-users", methods=["GET"])
+def api_admin_pending_users():
+    # חייב להיות מחובר
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
+
+    # רק DEVOPS רואה בקשות לאישור
+    if session.get("role") != "DEVOPS":
+        return jsonify({"success": False, "message": "אין לך הרשאה"}), 403
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, email, company_name, role, is_approved
+        FROM users
+        WHERE is_approved = 0
+        ORDER BY id DESC
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    users = [
+        {
+            "id": row["id"],
+            "email": row["email"],
+            "company_name": row["company_name"],
+            "role": row["role"],
+            "is_approved": row["is_approved"],
+        }
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "users": users})
 
 
 def init_db():
@@ -487,61 +664,67 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            role TEXT NOT NULL
+            role TEXT NOT NULL,
+            company_name TEXT,
+            is_approved INTEGER NOT NULL DEFAULT 0
         )
         """
     )
+
     # ---------- טבלת קישור בין משרות לקו"ח ----------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS job_candidates (
-            job_id     INTEGER NOT NULL,                              -- לאיזו משרה
-            cv_id      INTEGER NOT NULL,                              -- איזה קו"ח (מ-candidates)
+            job_id     INTEGER NOT NULL,
+            cv_id      INTEGER NOT NULL,
             linked_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            PRIMARY KEY (job_id, cv_id),                              -- כל קו"ח פעם אחת לכל משרה
+            PRIMARY KEY (job_id, cv_id),
             FOREIGN KEY(job_id) REFERENCES jobs(id),
             FOREIGN KEY(cv_id)  REFERENCES candidates(cv_id)
         )
         """
     )
 
- # ---------- טבלת משרות ----------
+    # ---------- טבלת משרות ----------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,                    -- שם משרה
-            description TEXT NOT NULL,              -- תיאור חופשי
-            must_requirements TEXT NOT NULL,        -- דרישות חובה
-            nice_to_have_requirements TEXT,         -- דרישות יתרון (לא חובה)
-            location TEXT,                          -- מיקום (אופציונלי)
-            employment_type TEXT,                   -- סוג משרה (פול טיים/פרילנס וכו')
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            must_requirements TEXT NOT NULL,
+            nice_to_have_requirements TEXT,
+            location TEXT,
+            employment_type TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            is_active INTEGER NOT NULL DEFAULT 1    -- 1=פעיל, 0=סגור
+            is_active INTEGER NOT NULL DEFAULT 1
         )
         """
     )
+
     # 4 משתמשי דמו
     demo_users = [
-        ("hr_manager@example.com", "123456", "HR_MANAGER"),
-        ("hr_lead@example.com", "123456", "HR_LEAD"),
-        ("recruiter@example.com", "123456", "RECRUITER"),
-        ("devops@example.com", "123456", "DEVOPS"),
+        ("hr_manager@example.com", "123456", "HR_MANAGER", "Demo Company HR"),
+        ("hr_lead@example.com", "123456", "HR_LEAD", "Demo Company HR"),
+        ("recruiter@example.com", "123456", "RECRUITER", "Demo Company HR"),
+        ("devops@example.com", "123456", "DEVOPS", "Platform Admin"),
     ]
 
-    for email, plain_pwd, role in demo_users:
+    for email, plain_pwd, role, company_name in demo_users:
         cur.execute("SELECT id FROM users WHERE email = ?", (email,))
         if cur.fetchone() is None:
             pwd_hash = generate_password_hash(plain_pwd)
             cur.execute(
-                "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-                (email, pwd_hash, role),
+                """
+                INSERT INTO users (email, password_hash, role, company_name, is_approved)
+                VALUES (?, ?, ?, ?, 1)
+                """,
+                (email, pwd_hash, role, company_name),
             )
 
     conn.commit()
     conn.close()
     print("✅ DB Ready – cv_matcher.db מוכן (users + jobs)")
-
 
 # ----------------- LOGIN API -----------------
 
@@ -568,6 +751,12 @@ def login():
 
     if not check_password_hash(row["password_hash"], password):
         return jsonify({"success": False, "message": "סיסמה שגויה"}), 401
+    
+    if not row["is_approved"]:
+        return jsonify({
+                "success": False,
+            "message": "החשבון שלך עדיין ממתין לאישור מנהל המערכת"
+        }), 403
 
     # שומרים בסשן
     session["user_id"] = row["id"]

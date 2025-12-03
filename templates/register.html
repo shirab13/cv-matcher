@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>הרשמה כמנהל/ת HR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Arial, Helvetica, sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .register-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      margin: 20px;
+      box-sizing: border-box;
+    }
+
+    .logo-section {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a202c;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #718096;
+      text-align: center;
+      margin: 0 0 24px 0;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 14px;
+      text-align: right;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+      text-align: right;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .register-button {
+      width: 100%;
+      padding: 13px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 8px;
+    }
+
+    .register-button:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .register-button:active {
+      transform: translateY(0);
+    }
+
+    .back-to-login {
+      text-align: center;
+      color: #718096;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+
+    .back-to-login a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .back-to-login a:hover {
+      text-decoration: underline;
+    }
+
+    .message-box {
+      background: #48bb78;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      text-align: center;
+      font-weight: 500;
+      display: none;
+    }
+
+    .message-box.show {
+      display: block;
+    }
+
+    .message-box.error {
+      background: #e53e3e;
+    }
+  </style>
+</head>
+<body>
+  <div class="register-container">
+    <div class="message-box" id="msgBox"></div>
+
+    <div class="logo-section">
+      <h1>הרשמה כמנהל/ת HR</h1>
+      <p class="subtitle">
+        מלאי את הפרטים הבאים כדי לבקש פתיחת חשבון לחברתכם
+      </p>
+    </div>
+
+    <form id="registerForm">
+      <div class="form-group">
+        <label for="company_name">שם חברה</label>
+        <input type="text" id="company_name" placeholder="הזיני את שם החברה" required>
+      </div>
+
+      <div class="form-group">
+        <label for="email">אימייל מנהל/ת HR</label>
+        <input type="email" id="email" placeholder="example@company.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">סיסמה</label>
+        <input type="password" id="password" placeholder="בחרי סיסמה" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password_confirm">אימות סיסמה</label>
+        <input type="password" id="password_confirm" placeholder="הקלידי שוב את הסיסמה" required>
+      </div>
+
+      <button type="submit" class="register-button">שליחת בקשת הרשמה</button>
+    </form>
+
+    <p class="back-to-login">
+      כבר יש לך משתמש? <a href="/">חזרה להתחברות</a>
+    </p>
+  </div>
+
+  <script>
+    const form = document.getElementById('registerForm');
+    const box  = document.getElementById('msgBox');
+
+    function showMsg(txt, isError = false) {
+        box.textContent = txt;
+        box.classList.add('show');
+        if (isError) box.classList.add('error');
+        else box.classList.remove('error');
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const company_name = document.getElementById('company_name').value.trim();
+        const email        = document.getElementById('email').value.trim();
+        const password     = document.getElementById('password').value.trim();
+        const password2    = document.getElementById('password_confirm').value.trim();
+
+        if (!company_name || !email || !password || !password2) {
+        showMsg('נא למלא את כל השדות', true);
+        return;
+        }
+
+        if (password !== password2) {
+        showMsg('הסיסמאות אינן תואמות', true);
+        return;
+        }
+
+        try {
+        const res = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company_name, email, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+            showMsg(data.message || 'שגיאה בהרשמה', true);
+            return;
+        }
+
+        // הצלחה
+        showMsg(data.message || 'ההרשמה נקלטה בהצלחה ✅', false);
+        form.reset();
+
+        } catch (err) {
+        console.error(err);
+        showMsg('שגיאה בשרת, נסי שוב מאוחר יותר', true);
+        }
+    });
+    </script>
+
+</body>
+</html>

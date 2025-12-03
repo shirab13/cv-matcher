@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>העלאת קו"ח – DevOps</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Arial, Helvetica, sans-serif;
+        background: #f7fafc;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #1a202c;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+        color: #2d3748;
+      }
+
+      select,
+      input[type="file"] {
+        width: 100%;
+        padding: 8px 10px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e0;
+        font-size: 14px;
+      }
+
+      button {
+        background: #2d3748;
+        color: #ffffff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      button:hover {
+        background: #1a202c;
+      }
+
+      .back-link {
+        display: inline-block;
+        margin-top: 15px;
+        font-size: 14px;
+        color: #4299e1;
+        text-decoration: none;
+      }
+
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>העלאת קו"ח חדשה</h1>
+
+      <form method="post" enctype="multipart/form-data">
+        <label for="job_id">לאיזו משרה לשייך?</label>
+        <select name="job_id" id="job_id" required>
+          <option value="">בחרי משרה...</option>
+          {% for job in jobs %}
+            <option value="{{ job.id }}">{{ job.title }} (ID: {{ job.id }})</option>
+          {% endfor %}
+        </select>
+
+        <label for="cv_file">קובץ קו"ח (PDF או DOCX)</label>
+        <input
+          type="file"
+          name="cv_file"
+          id="cv_file"
+          accept=".pdf,.docx"
+          required
+        />
+
+        <button type="submit">העלה ועבד קו"ח</button>
+      </form>
+
+      <a href="/dashboard/devops" class="back-link">⬅ חזרה לדשבורד DevOps</a>
+    </div>
+  </body>
+</html>

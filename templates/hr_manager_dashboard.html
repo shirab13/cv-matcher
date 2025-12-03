@@ -625,6 +625,13 @@
                 <textarea class="form-textarea" id="jobRequirements" required
                           placeholder="פרט את הדרישות הטכניות, השכלה, כישורים נדרשים..."></textarea>
               </div>
+              <!-- 🆕 דרישות יתרון (לא חובה) -->
+              <div class="form-group full-width">
+                <label class="form-label">דרישות יתרון (לא חובה)</label>
+                <textarea class="form-textarea" id="jobNiceRequirements"
+                          placeholder="לדוגמה: ניסיון בתחום הפינטק, תואר שני, עניין ב-AI..."></textarea>
+              </div>
+              
               <div class="form-group">
                 <label class="form-label">טווח שכר (אופציונלי)</label>
                 <input type="text" class="form-input" id="salaryRange" placeholder="לדוגמה: 15,000-20,000 ₪">
@@ -698,29 +705,31 @@
 
   <script>
     // נתונים לדמו – בינתיים בצד לקוח, אח"כ נחליף ל-API מהבק
-    const jobsData = [
-      {
-        id: 1,
-        title: "מפתח Full Stack",
-        location: "תל אביב",
-        openDate: "2024-01-15",
-        approvedCandidates: 5
-      },
-      {
-        id: 2,
-        title: "מנהל פרויקטים",
-        location: "חיפה",
-        openDate: "2024-01-10",
-        approvedCandidates: 3
-      },
-      {
-        id: 3,
-        title: "מעצב UX/UI",
-        location: "ירושלים",
-        openDate: "2024-01-20",
-        approvedCandidates: 7
-      }
-    ];
+    // משרות דמו – עם IDs שליליים כדי שלא יתנגשו עם המשרות מה-DB
+  const jobsData = [
+    {
+      id: -1,
+      title: "מפתח Full Stack",
+      location: "תל אביב",
+      openDate: "2024-01-15",
+      approvedCandidates: 5
+    },
+    {
+      id: -2,
+      title: "מנהל פרויקטים",
+      location: "חיפה",
+      openDate: "2024-01-10",
+      approvedCandidates: 3
+    },
+    {
+      id: -3,
+      title: "מעצב UX/UI",
+      location: "ירושלים",
+      openDate: "2024-01-20",
+      approvedCandidates: 7
+    }
+  ];
+
 
     const candidatesData = {
       1: [
@@ -781,35 +790,66 @@
       }
     }
 
-    function renderJobs() {
+    async function renderJobs() {
       const jobsGrid = document.getElementById('jobsGrid');
+      jobsGrid.innerHTML = 'טוען משרות...';
+
+      let dynamicJobs = [];
+
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.jobs)) {
+            dynamicJobs = data.jobs;
+          }
+        }
+      } catch (err) {
+        console.error('שגיאה בטעינת משרות מהשרת:', err);
+      }
+
+      // מאחדים בין משרות הדמו למשרות מה-DB
+      const allJobs = [...jobsData, ...dynamicJobs];
+
+      if (allJobs.length === 0) {
+        jobsGrid.innerHTML = 'אין משרות להצגה כרגע';
+        return;
+      }
+
       jobsGrid.innerHTML = '';
 
-      jobsData.forEach(job => {
+      allJobs.forEach(job => {
         const jobCard = document.createElement('div');
         jobCard.className = 'job-card';
         jobCard.onclick = () => showJobCandidates(job.id);
+
+        const openDate =
+          job.openDate ||
+          job.open_date ||
+          job.created_at ||
+          new Date().toISOString().split('T')[0];
 
         jobCard.innerHTML = `
           <div class="job-title">${job.title}</div>
           <div class="job-details">
             <div class="job-detail">
               <span>📍</span>
-              <span>${job.location}</span>
+              <span>${job.location || 'לא צוין מיקום'}</span>
             </div>
             <div class="job-detail">
               <span>📅</span>
-              <span>נפתח: ${formatDate(job.openDate)}</span>
+          <span>נפתח:    ${formatDate(openDate)}</span>
             </div>
           </div>
           <div class="candidates-info">
-            <span class="candidates-count">${job.approvedCandidates} מועמדים מאושרים</span>
-            <span class="approved-badge">מאושר</span>
+          <span class="candidates-count">${job.approvedCandidates || 0} מועמדים מאושרים</span>
+           <span class="approved-badge">מאושר</span>
           </div>
         `;
         jobsGrid.appendChild(jobCard);
       });
     }
+
 
     function showJobCandidates(jobId) {
       currentJobId = jobId;
@@ -890,41 +930,82 @@
       }
     }
 
-    function submitJob(event) {
+   async function submitJob(event) {
       event.preventDefault();
 
-      const jobData = {
-        name: document.getElementById('jobName').value,
-        location: document.getElementById('jobLocation').value,
-        type: document.getElementById('jobType').value,
-        experience: document.getElementById('experienceLevel').value,
-        description: document.getElementById('jobDescription').value,
-        requirements: document.getElementById('jobRequirements').value,
-        salary: document.getElementById('salaryRange').value,
-        closingDate: document.getElementById('closingDate').value
+      const name = document.getElementById('jobName').value.trim();
+      const location = document.getElementById('jobLocation').value;
+      const type = document.getElementById('jobType').value;
+      const experience = document.getElementById('experienceLevel').value;
+      const description = document.getElementById('jobDescription').value.trim();
+      const requirements = document.getElementById('jobRequirements').value.trim();
+      const niceRequirements = document.getElementById('jobNiceRequirements').value.trim(); // ✅ תואם ל-ID ב-HTML
+      const salary = document.getElementById('salaryRange').value.trim();
+      const closingDate = document.getElementById('closingDate').value;
+
+      // ולידציה בסיסית – כמו בצד שרת
+      if (!name || !description || !requirements || !location) {
+        showMessage('חובה למלא שם משרה, מיקום, תיאור ודרישות חובה');
+        return;
+      }
+
+      // ✅ שמות שדות תואמים ל-backend
+      const payload = {
+        title: name,
+        description: description,
+        must_requirements: requirements,
+        nice_to_have_requirements: niceRequirements || null,
+        location: location,
+        employment_type: type || null,
+        // שדות נוספים – השרת יתעלם אם לא משתמשים בהם כרגע
+        experience_level: experience || null,
+        salary_range: salary || null,
+        closing_date: closingDate || null,
       };
 
-      // כרגע זה רק ב-frontend. בהמשך נעשה fetch ל-API בפייתון שישמור DB.
-      const newJob = {
-        id: jobsData.length + 1,
-        title: jobData.name,
-        location: jobData.location,
-        openDate: new Date().toISOString().split('T')[0],
-        approvedCandidates: 0
-      };
+      const submitBtn = document.getElementById('submitJobBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'שולח...';
 
-      jobsData.push(newJob);
-      candidatesData[newJob.id] = [];
+      try {
+        const res = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      showMessage('המשרה נשלחה בהצלחה! עודכן אוטומטית אצל HR Manager והמגייסים');
+        const data = await res.json().catch(() => ({}));
 
-      document.getElementById('jobForm').reset();
+        if (!res.ok || !data.success) {
+          showMessage(data.message || 'שגיאה בשמירת המשרה בשרת');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'שלח משרה';
+          return;
+        }
 
-      setTimeout(() => {
+        showMessage('המשרה נשמרה בהצלחה במערכת!');
+
+        // איפוס טופס
+        document.getElementById('jobForm').reset();
+
+        // החזרת הכפתור למצב רגיל
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'שלח משרה';
+
+        // מרעננים את רשימת המשרות – עכשיו גם מה-DB
+        await renderJobs();
         showTab('openJobs', { target: document.querySelector('.tabs .tab') });
-        renderJobs();
-      }, 1500);
+
+      } catch (err) {
+        console.error(err);
+        showMessage('שגיאה בתקשורת עם השרת');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'שלח משרה';
+      }
     }
+
+
+
 
     function showMessage(message) {
       const successMessage = document.getElementById('successMessage');

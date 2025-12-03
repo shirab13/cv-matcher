@@ -33,7 +33,18 @@ CREATE TABLE IF NOT EXISTS cv_scores (
   updated_at                    TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   FOREIGN KEY(cv_id) REFERENCES candidates(cv_id)
 );
+
+-- 🔹 טבלת קישור בין משרה (מה-DB של auth_server) לבין CV (מהטבלה candidates)
+CREATE TABLE IF NOT EXISTS job_candidates (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id     INTEGER NOT NULL,   -- זה ה-id של המשרה מה-DB של auth_server
+  cv_id      INTEGER NOT NULL,   -- זה ה-cv_id מהטבלה candidates
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  FOREIGN KEY (cv_id) REFERENCES candidates(cv_id),
+  UNIQUE(job_id, cv_id)          -- שלא יהיה אותו CV פעמיים לאותה משרה
+);
 """
+
 
 def connect(db_path: str) -> sqlite3.Connection:
     """פותח חיבור למסד הנתונים ויוצר טבלאות אם חסרות."""
@@ -96,5 +107,18 @@ def upsert_age_score(
             updated_at=(datetime('now','localtime'))
         """,
         (cv_id, age_score, birth_year, age, reason, confidence, factor, final_score),
+    )
+    con.commit()
+def link_cv_to_job(con: sqlite3.Connection, cv_id: int, job_id: int):
+    """
+    קושר CV למשרה (job_id מגיע מטבלת jobs ב-auth_server).
+    אם הקישור כבר קיים – INSERT OR IGNORE מונע כפילות.
+    """
+    con.execute(
+        """
+        INSERT OR IGNORE INTO job_candidates (job_id, cv_id)
+        VALUES (?, ?)
+        """,
+        (job_id, cv_id),
     )
     con.commit()

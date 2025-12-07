@@ -249,23 +249,15 @@
         return;
       }
 
-      const role = data.role;  // מגיע מה־Flask
+      const role = data.role;           // למשל: HR_MANAGER, HR_LEAD, RECRUITER, DEVOPS
+      const redirectUrl = data.redirect_url || '/';
 
       showMessage('התחברת כ-' + role + ' ✅', false);
 
       setTimeout(() => {
-        if (role === 'HR_ADMIN') {
-          window.location.href = '/dashboard/hr-admin';
-        } else if (role === 'HR_MANAGER') {
-          window.location.href = '/dashboard/hr-manager';
-        } else if (role === 'RECRUITER') {
-          window.location.href = '/dashboard/recruiter';
-        } else if (role === 'DEVOPS') {
-          window.location.href = '/dashboard/devops';
-        } else {
-          window.location.href = '/dashboard';
-        }
+        window.location.href = redirectUrl;
       }, 1000);
+
 
     } catch (err) {
       console.error(err);

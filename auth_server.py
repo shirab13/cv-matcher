@@ -117,8 +117,8 @@ def api_register():
     try:
         cur.execute(
             """
-            INSERT INTO users (email, password_hash, role, company_name, is_approved)
-            VALUES (?, ?, ?, ?, 0)
+            INSERT INTO users (email, password_hash, role, company_name, is_approved, manager_id)
+            VALUES (?, ?, ?, ?, 0, NULL)
             """,
             (email, password_hash, "HR_MANAGER", company_name),
         )
@@ -230,6 +230,7 @@ def hr_manager_dashboard():
     return render_template("hr_manager_dashboard.html", user_email=user_email)
 
 
+
 @app.route("/dashboard/recruitment-manager")
 def rm_dashboard():
     # אם תרצי, אפשר להוסיף כאן בדיקת תפקיד HR_LEAD
@@ -240,7 +241,7 @@ def rm_dashboard():
         return "אין לך הרשאה לדף הזה", 403
 
     user_email = session.get("email") or "מנהל/ת גיוס"
-    return render_template("recruitment_manager_dashboard.html", user_email=user_email)
+    return render_template("hr_admin_dashboard.html", user_email=user_email)
 
 
 @app.route("/dashboard/recruiter")
@@ -552,6 +553,132 @@ def devops_required(f):
             return jsonify({"success": False, "message": "אין לך הרשאה לפעולה הזו"}), 403
         return f(*args, **kwargs)
     return wrapper
+
+# -----------------helper להרשאות hr_manager בלבד -----------------
+def hr_manager_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
+
+        if session.get("role") != "HR_MANAGER":
+            return jsonify({"success": False, "message": "אין לך הרשאה לפעולה הזו"}), 403
+
+        return f(*args, **kwargs)
+    return wrapper
+# ----------------החזרת רשימת משתמשי הצוות של מנהל ה-HR -----------------
+@app.route("/api/hr/team-users", methods=["GET"])
+@hr_manager_required
+def api_hr_team_users():
+    manager_id = session["user_id"]
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id, email, role, company_name
+        FROM users
+        WHERE manager_id = ?
+          AND is_approved = 1
+          AND role IN ('HR_LEAD', 'RECRUITER')
+        ORDER BY id DESC
+        """,
+        (manager_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    users = [
+        {
+            "id": row["id"],
+            "email": row["email"],
+            "role": row["role"],
+            "company_name": row["company_name"],
+        }
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "users": users})
+# ----------------POST: יצירת משתמש צוות חדש ע"י מנהל HR -----------------
+@app.route("/api/hr/team-users", methods=["POST"])
+@hr_manager_required
+def api_hr_create_team_user():
+    data = request.get_json() or {}
+
+    email = (data.get("email") or "").strip().lower()
+    role = (data.get("role") or "").strip().upper()
+    password = (data.get("password") or "").strip()
+
+    # ולידציה בסיסית
+    if not email or not role or not password:
+        return jsonify({
+            "success": False,
+            "message": "חובה למלא אימייל, תפקיד וסיסמה זמנית"
+        }), 400
+
+    if role not in ("HR_LEAD", "RECRUITER"):
+        return jsonify({
+            "success": False,
+            "message": "ניתן ליצור רק HR_LEAD או RECRUITER"
+        }), 400
+
+    if len(password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "הסיסמה חייבת להיות באורך 6 תווים לפחות"
+        }), 400
+
+    manager_id = session["user_id"]
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # מביאים את שם החברה של המנהל HR – כדי שכל הצוות יהיה על אותה חברה
+    cur.execute("SELECT company_name FROM users WHERE id = ?", (manager_id,))
+    manager_row = cur.fetchone()
+    if not manager_row:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "לא נמצא מנהל HR המחובר"
+        }), 500
+
+    company_name = manager_row["company_name"]
+
+    # בדיקה אם האימייל כבר קיים
+    cur.execute("SELECT id FROM users WHERE email = ?", (email,))
+    if cur.fetchone() is not None:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "אימייל זה כבר רשום במערכת"
+        }), 400
+
+    password_hash = generate_password_hash(password)
+
+    try:
+        cur.execute(
+            """
+            INSERT INTO users (email, password_hash, role, company_name, is_approved, manager_id)
+            VALUES (?, ?, ?, ?, 1, ?)
+            """,
+            (email, password_hash, role, company_name, manager_id),
+        )
+        new_id = cur.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "משתמש צוות חדש נוצר בהצלחה",
+        "user_id": new_id,
+        "email": email,
+        "role": role,
+        "company_name": company_name
+    }), 201
+
 # -----------------API: רשימת משתמשים ממתינים לאישור-----------------
 
 @app.route("/api/admin/pending-users", methods=["GET"])
@@ -615,44 +742,6 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-
-@app.route("/api/admin/pending-users", methods=["GET"])
-def api_admin_pending_users():
-    # חייב להיות מחובר
-    if "user_id" not in session:
-        return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
-
-    # רק DEVOPS רואה בקשות לאישור
-    if session.get("role") != "DEVOPS":
-        return jsonify({"success": False, "message": "אין לך הרשאה"}), 403
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, email, company_name, role, is_approved
-        FROM users
-        WHERE is_approved = 0
-        ORDER BY id DESC
-        """
-    )
-    rows = cur.fetchall()
-    conn.close()
-
-    users = [
-        {
-            "id": row["id"],
-            "email": row["email"],
-            "company_name": row["company_name"],
-            "role": row["role"],
-            "is_approved": row["is_approved"],
-        }
-        for row in rows
-    ]
-
-    return jsonify({"success": True, "users": users})
-
-
 def init_db():
     """יוצר טבלת משתמשים ומוסיף 4 משתמשי דמו אם עדיין לא קיימים."""
     conn = get_db()
@@ -666,7 +755,9 @@ def init_db():
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL,
             company_name TEXT,
-            is_approved INTEGER NOT NULL DEFAULT 0
+            is_approved INTEGER NOT NULL DEFAULT 0,
+            manager_id INTEGER,
+            FOREIGN KEY (manager_id) REFERENCES users(id)
         )
         """
     )
@@ -702,7 +793,7 @@ def init_db():
         """
     )
 
-    # 4 משתמשי דמו
+        # 4 משתמשי דמו
     demo_users = [
         ("hr_manager@example.com", "123456", "HR_MANAGER", "Demo Company HR"),
         ("hr_lead@example.com", "123456", "HR_LEAD", "Demo Company HR"),
@@ -710,16 +801,39 @@ def init_db():
         ("devops@example.com", "123456", "DEVOPS", "Platform Admin"),
     ]
 
-    for email, plain_pwd, role, company_name in demo_users:
+    # קודם נוודא שה-HR_MANAGER קיים ונקבל את ה-id שלו
+    cur.execute("SELECT id FROM users WHERE email = ?", ("hr_manager@example.com",))
+    row = cur.fetchone()
+    if row is None:
+        pwd_hash = generate_password_hash("123456")
+        cur.execute(
+            """
+            INSERT INTO users (email, password_hash, role, company_name, is_approved, manager_id)
+            VALUES (?, ?, ?, ?, 1, NULL)
+            """,
+            ("hr_manager@example.com", pwd_hash, "HR_MANAGER", "Demo Company HR"),
+        )
+        hr_manager_id = cur.lastrowid
+    else:
+        hr_manager_id = row["id"]
+
+    # עכשיו נוסיף את שאר המשתמשים (HR_LEAD, RECRUITER, DEVOPS)
+    other_demo_users = [
+        ("hr_lead@example.com", "123456", "HR_LEAD", "Demo Company HR", hr_manager_id),
+        ("recruiter@example.com", "123456", "RECRUITER", "Demo Company HR", hr_manager_id),
+        ("devops@example.com", "123456", "DEVOPS", "Platform Admin", None),
+    ]
+
+    for email, plain_pwd, role, company_name, manager_id in other_demo_users:
         cur.execute("SELECT id FROM users WHERE email = ?", (email,))
         if cur.fetchone() is None:
             pwd_hash = generate_password_hash(plain_pwd)
             cur.execute(
                 """
-                INSERT INTO users (email, password_hash, role, company_name, is_approved)
-                VALUES (?, ?, ?, ?, 1)
+                INSERT INTO users (email, password_hash, role, company_name, is_approved, manager_id)
+                VALUES (?, ?, ?, ?, 1, ?)
                 """,
-                (email, pwd_hash, role, company_name),
+                (email, pwd_hash, role, company_name, manager_id),
             )
 
     conn.commit()

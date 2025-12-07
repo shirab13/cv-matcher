@@ -558,6 +558,9 @@
           <button class="tab" onclick="showTab('jobHistory', event)">
             <span id="jobHistoryTitle">היסטוריית משרות</span>
           </button>
+          <button class="tab" onclick="showTab('team', event)">
+            <span id="teamTabTitle">ניהול צוות</span>
+          </button>
         </div>
       </div>
 
@@ -700,6 +703,61 @@
           </div>
         </div>
       </div>
+            <!-- 🆕 Team Management Tab -->
+      <div id="teamTab" class="tab-content">
+        <div class="section-header" style="margin-bottom: 20px;">
+          <h2 class="section-title" style="font-size: 20px; margin: 0 0 8px;">ניהול צוות גיוס</h2>
+          <p class="section-subtitle" style="margin: 0; color: #4a5568; font-size: 14px;">
+            כאן ניתן לראות את אנשי הצוות בחברה ולהוסיף מגייסים וראשי צוות חדשים.
+          </p>
+        </div>
+
+        <!-- רשימת משתמשי הצוות -->
+        <div class="history-table">
+          <div class="table-header">
+            <div>אימייל</div>
+            <div>תפקיד</div>
+            <div>חברה</div>
+            <div>סטטוס</div>
+            <div></div>
+          </div>
+          <div id="teamUsersBody">
+            <!-- שורות הצוות יתווספו כאן ב-JS -->
+          </div>
+        </div>
+
+        <!-- טופס הוספת משתמש צוות חדש -->
+        <div class="job-form" style="margin-top: 30px;">
+          <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; color: #2d3748;">
+            הוספת משתמש צוות חדש
+          </h3>
+          <form id="teamUserForm" onsubmit="submitTeamUser(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">אימייל</label>
+                <input type="email" class="form-input" id="teamUserEmail" required placeholder="example@company.com">
+              </div>
+              <div class="form-group">
+                <label class="form-label">סיסמה זמנית</label>
+                <input type="password" class="form-input" id="teamUserPassword" required minlength="6"
+                       placeholder="לפחות 6 תווים">
+              </div>
+              <div class="form-group">
+                <label class="form-label">תפקיד</label>
+                <select class="form-select" id="teamUserRole" required>
+                  <option value="">בחר תפקיד</option>
+                  <option value="HR_LEAD">ראש צוות HR</option>
+                  <option value="RECRUITER">מגייס/ת</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" id="teamUserSubmitBtn">
+              יצירת משתמש צוות
+            </button>
+          </form>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -787,8 +845,123 @@
 
       if (tabName === 'openJobs') {
         showJobsList();
+      } else if (tabName === 'team') {
+        fetchTeamUsers();
       }
     }
+    
+    
+    async function fetchTeamUsers() {
+      const body = document.getElementById('teamUsersBody');
+      if (!body) return;
+
+      body.innerHTML = '<div style="padding: 20px; text-align: center; color: #4a5568;">טוען משתמשים...</div>';
+
+      try {
+        const res = await fetch('/api/hr/team-users');
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          body.innerHTML = '<div style="padding: 20px; text-align: center; color: #e53e3e;">שגיאה בטעינת משתמשי הצוות</div>';
+          return;
+        }
+
+        const users = Array.isArray(data.users) ? data.users : [];
+
+        if (users.length === 0) {
+          body.innerHTML = '<div style="padding: 20px; text-align: center; color: #4a5568;">אין עדיין משתמשים בצוות</div>';
+          return;
+        }
+
+        body.innerHTML = '';
+
+        users.forEach(user => {
+          const row = document.createElement('div');
+          row.className = 'table-row';
+
+          const roleLabel =
+            user.role === 'HR_LEAD'
+              ? 'ראש צוות HR'
+              : user.role === 'RECRUITER'
+              ? 'מגייס/ת'
+              : user.role;
+
+          const statusBadge = `
+            <span style="background: #c6f6d5; color: #22543d; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+             פעיל
+            </span>
+          `;
+
+          row.innerHTML = `
+            <div style="font-weight: 600; color: #1a202c;">${user.email}</div>
+            <div>${roleLabel}</div>
+            <div>${user.company_name || ''}</div>
+            <div>${statusBadge}</div>
+            <div></div>
+          `;
+
+          body.appendChild(row);
+        });
+      } catch (err) {
+        console.error('שגיאה בטעינת משתמשים:', err);
+        body.innerHTML = '<div style="padding: 20px; text-align: center; color: #e53e3e;">שגיאה בתקשורת עם השרת</div>';
+      }
+    }
+
+    async function submitTeamUser(event) {
+      event.preventDefault();
+
+      const emailInput = document.getElementById('teamUserEmail');
+      const passwordInput = document.getElementById('teamUserPassword');
+      const roleSelect = document.getElementById('teamUserRole');
+      const submitBtn = document.getElementById('teamUserSubmitBtn');
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+      const role = roleSelect.value;
+
+      if (!email || !password || !role) {
+        showMessage('חובה למלא אימייל, סיסמה ותפקיד');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'יוצר...';
+
+      try {
+        const res = await fetch('/api/hr/team-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, role }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          showMessage(data.message || 'שגיאה ביצירת משתמש הצוות');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'יצירת משתמש צוות';
+          return;
+        }
+
+        showMessage('משתמש הצוות נוצר בהצלחה');
+
+        // איפוס טופס
+        emailInput.value = '';
+        passwordInput.value = '';
+        roleSelect.value = '';
+
+        // רענון רשימת הצוות
+        await fetchTeamUsers();
+      } catch (err) {
+        console.error('שגיאה ביצירת משתמש צוות:', err);
+        showMessage('שגיאה בתקשורת עם השרת');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'יצירת משתמש צוות';
+      }
+    }
+
 
     async function renderJobs() {
       const jobsGrid = document.getElementById('jobsGrid');

@@ -120,7 +120,7 @@ def api_register():
             INSERT INTO users (email, password_hash, role, company_name, is_approved, manager_id)
             VALUES (?, ?, ?, ?, 0, NULL)
             """,
-            (email, password_hash, "HR_MANAGER", company_name),
+            (email, password_hash, "HR_LEAD", company_name),
         )
         conn.commit()
     finally:
@@ -554,18 +554,20 @@ def devops_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-# -----------------helper להרשאות hr_manager בלבד -----------------
+# -----------------helper להרשאות hr_LEAD בלבד -----------------
 def hr_manager_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
             return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
 
-        if session.get("role") != "HR_MANAGER":
+        # היה: HR_MANAGER
+        if session.get("role") != "HR_LEAD":
             return jsonify({"success": False, "message": "אין לך הרשאה לפעולה הזו"}), 403
 
         return f(*args, **kwargs)
     return wrapper
+
 # ----------------החזרת רשימת משתמשי הצוות של מנהל ה-HR -----------------
 @app.route("/api/hr/team-users", methods=["GET"])
 @hr_manager_required
@@ -581,7 +583,7 @@ def api_hr_team_users():
         FROM users
         WHERE manager_id = ?
           AND is_approved = 1
-          AND role IN ('HR_LEAD', 'RECRUITER')
+          AND role IN ('HR_MANAGER', 'RECRUITER')
         ORDER BY id DESC
         """,
         (manager_id,),
@@ -617,10 +619,10 @@ def api_hr_create_team_user():
             "message": "חובה למלא אימייל, תפקיד וסיסמה זמנית"
         }), 400
 
-    if role not in ("HR_LEAD", "RECRUITER"):
+    if role not in ("HR_MANAGER", "RECRUITER"):
         return jsonify({
             "success": False,
-            "message": "ניתן ליצור רק HR_LEAD או RECRUITER"
+            "message": "ניתן ליצור רק HR_MANAGER או RECRUITER"
         }), 400
 
     if len(password) < 6:

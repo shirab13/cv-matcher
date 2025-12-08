@@ -1,6 +1,7 @@
 # auth_server.py
 import os
 import sqlite3
+import re
 from functools import wraps
 from flask import abort
 import traceback
@@ -57,7 +58,97 @@ def allowed_file(filename: str) -> bool:
     _, ext = os.path.splitext(filename.lower())
     return ext in ALLOWED_EXTENSIONS
 
+def _normalize_text(text: str) -> str:
+    """
+    מנרמל טקסט:
+    - לאותיות קטנות
+    - מסיר סימני פיסוק, משאיר אותיות/מספרים
+    - מרווחים בודדים
+    """
+    if not text:
+        return ""
+    text = text.lower()
+    # משאירים אותיות (עברית/אנגלית) ומספרים, שאר התווים -> רווח
+    text = re.sub(r"[^a-zA-Zא-ת0-9+/#]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
+
+
+def _extract_keywords(text: str) -> set[str]:
+    """
+    מוציא "מילים משמעותיות" מטקסט:
+    - מוריד לרשום אותיות קטנות
+    - מפצל למילים
+    - מסנן מילים קצרות ומילות עצירה בסיסיות
+    """
+    if not text:
+        return set()
+
+    text = text.lower()
+
+    # מילות עצירה בסיסיות (גם קצת עברית וגם אנגלית)
+    stopwords = {
+        "של", "עם", "על", "או", "אם", "לא", "כן", "וכן", "ו", "the", "and", "for",
+        "to", "in", "on", "a", "an", "is", "are", "of"
+    }
+
+    # \w תופס גם אותיות בעברית בפייתון (יוניקוד)
+    words = re.findall(r"\w+", text)
+
+    keywords = {
+        w for w in words
+        if len(w) >= 3 and w not in stopwords
+    }
+
+    return keywords
+
+
+def score_requirements_from_text(cv_text: str, requirements_text: str) -> float:
+    """
+    מקבלת טקסט קו\"ח (cv_text) וטקסט דרישות משרה (requirements_text – משפטים/בולטים)
+    ומחזירה ציון 0–10 לפי כמה דרישות כוסו ע\"י הקו\"ח.
+
+    כל שורה/בולט בדרישות נחשבת "דרישה".
+    דרישה נחשבת מכוסה אם לפחות חצי מהמילים המשמעותיות שלה מופיעות בקו\"ח.
+    """
+    if not requirements_text:
+        # אם לא הוגדרו דרישות – אין מה לבדוק, נחזיר ציון מלא
+        return 10.0
+
+    # מפרקים לדרישות – לפי שורות / נקודות / נקודות־פסיק
+    raw_reqs = re.split(r"[\n;\u2022\-•]+", requirements_text)
+    req_lines = [r.strip() for r in raw_reqs if r.strip()]
+
+    if not req_lines:
+        return 10.0
+
+    cv_keywords = _extract_keywords(cv_text)
+    if not cv_keywords:
+        # אין מילים משמעותיות בקו\"ח → לא כיסינו כלום
+        return 0.0
+
+    covered_reqs = 0
+
+    for line in req_lines:
+        req_keywords = _extract_keywords(line)
+        if not req_keywords:
+            # דרישה ללא מילים משמעותיות – נתייחס כאילו אין מה לבדוק
+            continue
+
+        # כמה מילים מהדרישה מופיעות בקו\"ח
+        matched = sum(1 for w in req_keywords if w in cv_keywords)
+        ratio = matched / len(req_keywords)
+
+        # אם חצי ומעלה מהמילים הופיעו בקו\"ח – נספור אותה כ"מכוסה"
+        if ratio >= 0.5:
+            covered_reqs += 1
+
+    if covered_reqs == 0:
+        return 0.0
+
+    score = (covered_reqs / len(req_lines)) * 10.0
+    return round(score, 2)
 # ----------------- ROUTES בסיס -----------------
 
 @app.route("/")
@@ -573,6 +664,44 @@ def devops_upload_cv():
     except Exception as e:
         print("AGE SCORING ERROR (devops_upload_cv):", e)
     # לא מפיל את ההעלאה – ממשיכים הלאה
+        # ---------- REQUIREMENTS SCORING (must / nice-to-have) ----------
+    try:
+        # 1. נביא את הדרישות של המשרה מה-DB
+        cur.execute(
+            """
+            SELECT must_requirements, nice_to_have_requirements
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
+
+        if job_row:
+            must_txt = job_row["must_requirements"] or ""
+            nice_txt = job_row["nice_to_have_requirements"] or ""
+
+            # 2. טקסט מתוך ה-CV האנונימי
+            cv_text = extract_text_any(out_path) or ""
+
+            # 3. חישוב ציונים 0–10
+            must_score = score_requirements_from_text(cv_text, must_txt)
+            nice_score = score_requirements_from_text(cv_text, nice_txt) if nice_txt else None
+
+            # 4. עדכון טבלת הציונים (cv_scores)
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET must_requirements_score = ?,
+                    nice_to_have_score     = ?
+                WHERE cv_id = ?
+                """,
+                (must_score, nice_score, cv_id),
+            )
+            conn.commit()
+    except Exception as e:
+        print("REQ SCORING ERROR (devops_upload_cv):", e)
+        # לא מפיל את הבקשה – פשוט אין ציונים לדרישות
 
     # קישור למשרה בטבלת job_candidates
     try:
@@ -727,6 +856,43 @@ def upload_cv():
         """,
         (job_id, cv_id),
     )
+        # ---------- REQUIREMENTS SCORING (must / nice-to-have) ----------
+    try:
+        # 1. נביא את הדרישות של המשרה
+        cur.execute(
+            """
+            SELECT must_requirements, nice_to_have_requirements
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
+
+        if job_row:
+            must_txt = job_row["must_requirements"] or ""
+            nice_txt = job_row["nice_to_have_requirements"] or ""
+
+            # 2. טקסט מהקובץ האנונימי
+            cv_text = extract_text_any(output_path) or ""
+
+            # 3. חישוב ציונים
+            must_score = score_requirements_from_text(cv_text, must_txt)
+            nice_score = score_requirements_from_text(cv_text, nice_txt) if nice_txt else None
+
+            # 4. עדכון cv_scores
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET must_requirements_score = ?,
+                    nice_to_have_score     = ?
+                WHERE cv_id = ?
+                """,
+                (must_score, nice_score, cv_id),
+            )
+    except Exception as e:
+        print("REQ SCORING ERROR (/api/upload_cv):", e)
+
     con.commit()
     con.close()
 

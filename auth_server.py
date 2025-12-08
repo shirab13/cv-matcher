@@ -132,21 +132,22 @@ def api_register():
     }), 201
 
 
-# -----------------קליטת משרה חדשה-----------------
+# -----------------helper להרשאות hr_LEAD בלבד -----------------
+def hr_manager_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
 
+        # היה: HR_MANAGER
+        if session.get("role") != "HR_LEAD":
+            return jsonify({"success": False, "message": "אין לך הרשאה לפעולה הזו"}), 403
+
+        return f(*args, **kwargs)
+    return wrapper
+# -----------------קליטת משרה חדשה-----------------
 @app.route("/api/jobs", methods=["POST"])
 def create_job():
-    """
-    יצירת משרה חדשה ב־DB.
-    שדות חובה:
-      - title
-      - description
-      - must_requirements
-    שדות אופציונליים:
-      - nice_to_have_requirements
-      - location
-      - employment_type
-    """
     data = request.get_json() or {}
 
     title = (data.get("title") or "").strip()
@@ -163,18 +164,46 @@ def create_job():
             "message": "חובה למלא שם משרה, תיאור ודרישות חובה"
         }), 400
 
+    # 🟣 ה־user שמחובר עכשיו
+    current_user_id = session["user_id"]
+
     conn = get_db()
     cur = conn.cursor()
+
+    # 🟣 מביאים את ה-manager_id של המשתמש המחובר
+    cur.execute("SELECT manager_id FROM users WHERE id = ?", (current_user_id,))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "לא נמצא משתמש מחובר במערכת"
+        }), 500
+
+    manager_id = row["manager_id"]   # ⬅️ זה המספר 5 שאת רוצה
+
+    # (אופציונלי) אם יכול להיות שאין manager_id בכלל:
+    if manager_id is None:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "לא מוגדר מנהל עבור המשתמש, לא ניתן ליצור משרה"
+        }), 400
+
+    # יצירת המשרה עם ה-manager_id מהעמודה של המשתמש
     cur.execute(
         """
         INSERT INTO jobs (
             title, description, must_requirements,
-            nice_to_have_requirements, location, employment_type
+            nice_to_have_requirements, location, employment_type,
+            manager_id
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (title, description, must_req, nice_req, location, employment_type),
+        (title, description, must_req, nice_req, location, employment_type, manager_id),
     )
+
     job_id = cur.lastrowid
     conn.commit()
     conn.close()
@@ -184,23 +213,67 @@ def create_job():
         "message": "המשרה נוצרה בהצלחה",
         "job_id": job_id
     }), 201
+
+
 # -----------------רשימת משרות קיימות-----------------
 @app.route("/api/jobs", methods=["GET"])
 def list_jobs():
     """
-    מחזיר רשימת משרות פעילות לדשבורד:
-    id, title, location, created_at
+    מחזיר רשימת משרות מסוננות לפי מנהל ה-HR של המשתמש.
+    HR_LEAD → רואה את המשרות של עצמו (jobs.manager_id = user_id)
+    HR_MANAGER / RECRUITER → רואים משרות של המנהל שלהם (jobs.manager_id = users.manager_id)
+    DEVOPS → רואה הכל.
     """
+
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    user_id = session["user_id"]
+    role = session.get("role")
+
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, title, location, created_at
-        FROM jobs
-        WHERE is_active = 1
-        ORDER BY created_at DESC
-        """
-    )
+
+    manager_key = None  # זה הערך שנשתמש בו ב-WHERE manager_id = ?
+
+    if role == "DEVOPS":
+        # DEVOPS רואה הכל – נשאיר manager_key = None
+        manager_key = None
+
+    elif role == "HR_LEAD":
+        # ראש צוות HR – המשרות שקשורות אליו ישירות
+        manager_key = user_id
+
+    elif role in ("HR_MANAGER", "RECRUITER"):
+        # גם מנהל HR וגם מגייס/ת → הולכים לטבלת users להביא את ה-manager_id שלהם
+        cur.execute("SELECT manager_id FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        if row and row["manager_id"]:
+            manager_key = row["manager_id"]
+
+    # עכשיו מריצים את השאילתה בהתאם
+    if manager_key is not None:
+        cur.execute(
+            """
+            SELECT id, title, location, created_at
+            FROM jobs
+            WHERE is_active = 1
+              AND manager_id = ?
+            ORDER BY created_at DESC
+            """,
+            (manager_key,),
+        )
+    else:
+        # DEVOPS (או במקרה שאין manager_id מסיבה כלשהי) → הכל
+        cur.execute(
+            """
+            SELECT id, title, location, created_at
+            FROM jobs
+            WHERE is_active = 1
+            ORDER BY created_at DESC
+            """
+        )
+
     rows = cur.fetchall()
     conn.close()
 
@@ -215,6 +288,7 @@ def list_jobs():
     ]
 
     return jsonify({"success": True, "jobs": jobs})
+
 
 # ----------------- דשבורדים לפי תפקיד -----------------
 
@@ -554,19 +628,6 @@ def devops_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-# -----------------helper להרשאות hr_LEAD בלבד -----------------
-def hr_manager_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user_id" not in session:
-            return jsonify({"success": False, "message": "לא מחובר/ת"}), 401
-
-        # היה: HR_MANAGER
-        if session.get("role") != "HR_LEAD":
-            return jsonify({"success": False, "message": "אין לך הרשאה לפעולה הזו"}), 403
-
-        return f(*args, **kwargs)
-    return wrapper
 
 # ----------------החזרת רשימת משתמשי הצוות של מנהל ה-HR -----------------
 @app.route("/api/hr/team-users", methods=["GET"])
@@ -782,15 +843,16 @@ def init_db():
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            must_requirements TEXT NOT NULL,
-            nice_to_have_requirements TEXT,
-            location TEXT,
-            employment_type TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            is_active INTEGER NOT NULL DEFAULT 1
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        must_requirements TEXT NOT NULL,
+        nice_to_have_requirements TEXT,
+        location TEXT,
+        employment_type TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        is_active INTEGER NOT NULL DEFAULT 1,
+        manager_id INTEGER NOT NULL
         )
         """
     )

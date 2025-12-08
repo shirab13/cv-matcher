@@ -583,7 +583,7 @@
   <script>
     // דמו של משרות ומועמדים – כרגע בצד לקוח.
     // בהמשך נוכל להחליף לקריאה ל-API מהבק.
-    const jobsData = [
+    const demoJobs = [
       {
         id: 1,
         title: "מפתח Full Stack",
@@ -617,6 +617,9 @@
         newCandidates: 2
       }
     ];
+      let jobsData = [...demoJobs];
+
+  
 
     const candidatesData = {
       1: [
@@ -662,6 +665,42 @@
       ]
     };
 
+    async function loadJobsFromApi() {
+      try {
+        const res = await fetch('/api/jobs');
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          console.error('שגיאה בטעינת משרות מה־API:', data.message || res.status);
+          return;
+        }   
+
+        // ממפים את המשרות מהשרת לפורמט שה־UI מבין
+        const apiJobs = (data.jobs || []).map(job => ({
+          id: job.id,
+          title: job.title,
+          location: job.location || 'לא צוין מיקום',
+          // אצלך ב־API יש created_at, בדמו יש openDate – נעשה התאמה
+          openDate: job.created_at,
+          // כרגע אין לך נתוני מועמדים אמיתיים – נשאיר 0
+          totalCandidates: 0,
+          newCandidates: 0,
+          source: 'api'
+        }));
+
+        // אם את רוצה שהאמיתיים יהיו למעלה ואז הדמו:
+        jobsData = [...apiJobs, ...demoJobs];
+
+        // אם את רוצה קודם דמו ואז אמיתי – הפוך:
+        // jobsData = [...demoJobs, ...apiJobs];
+
+        renderJobs();
+      } catch (err) {
+        console.error('שגיאת רשת בטעינת משרות מה־API:', err);
+      }
+    }
+
+
     let currentJobId = null;
     let currentCandidateId = null;
     let allCandidates = [];
@@ -675,27 +714,35 @@
         jobCard.className = 'job-card';
         jobCard.onclick = () => showJobDetails(job.id);
 
+        // תאריך – או openDate (דמו) או created_at (API)
+        const openDate = job.openDate || job.created_at || job.open_date;
+
+        // כמות מועמדים – בדמו יש totalCandidates, ב־API כרגע 0
+        const totalCandidates = job.totalCandidates ?? 0;
+        const newCandidates = job.newCandidates ?? 0;
+
         jobCard.innerHTML = `
           <div class="job-title">${job.title}</div>
           <div class="job-details">
             <div class="job-detail">
               <span>📍</span>
-              <span>${job.location}</span>
+              <span>${job.location || 'לא צוין מיקום'}</span>
             </div>
             <div class="job-detail">
               <span>📅</span>
-              <span>נפתח: ${formatDate(job.openDate)}</span>
+          <span>נפתח:    ${openDate ? formatDate(openDate) : 'לא ידוע'}</span>
             </div>
           </div>
           <div class="candidates-info">
-            <span class="candidates-count">${job.totalCandidates} מועמדים</span>
-            ${job.newCandidates > 0 ? `<span class="new-candidates">${job.newCandidates} חדשים</span>` : ''}
+            <span class="candidates-count">${totalCandidates} מועמדים</span>
+            ${newCandidates > 0 ? `<span class="new-candidates">${newCandidates} חדשים</span>` : ''}
           </div>
         `;
 
         jobsGrid.appendChild(jobCard);
       });
-    }
+    } 
+
 
     function showJobDetails(jobId) {
       currentJobId = jobId;
@@ -898,6 +945,8 @@
     // חיבור כפתורים
     document.addEventListener('DOMContentLoaded', function () {
       renderJobs();
+       // ואז מוסיפים את המשרות האמיתיות כשיגיעו מהשרת
+      loadJobsFromApi();
 
       document.getElementById('backToJobs').onclick = showDashboard;
       document.getElementById('backToCandidates').onclick = showJobDetailsView;

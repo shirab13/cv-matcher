@@ -332,6 +332,18 @@
       padding: 30px;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
+    /* גריד מסודר לטופס יצירת משתמש צוות */
+    .team-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 עמודות במסך רחב */
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .team-form-grid {
+        grid-template-columns: 1fr; /* במסכים צרים – עמודה אחת מתחת לשנייה */
+      }
+    }
 
     .feedback-item {
       display: flex;
@@ -544,331 +556,389 @@
     <div class="success-message" id="successMessage">
      הפעולה בוצעה בהצלחה!
     </div>
-    <div class="page-header">
-     <h1 class="page-title" id="dashboardTitle">דשבורד מנהל HR</h1>
-     <p class="page-subtitle">ניהול ובקרה על עבודת הצוות והסטטיסטיקות</p>
-    </div>
-    <div class="stats-grid">
-     <div class="stat-card">
-      <div class="stat-number">
-       47
+    <div id="dashboardSection">
+      <div class="page-header">
+      <h1 class="page-title" id="dashboardTitle">דשבורד מנהל HR</h1>
+      <p class="page-subtitle">ניהול ובקרה על עבודת הצוות והסטטיסטיקות</p>
       </div>
-      <div class="stat-label">
-       משרות פעילות
+      <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">
+        47
+        </div>
+        <div class="stat-label">
+         משרות פעילות
+        </div>
       </div>
-     </div>
-     <div class="stat-card">
-      <div class="stat-number">
-       312
+      <div class="stat-card">
+        <div class="stat-number">
+         312
+        </div>
+        <div class="stat-label">
+         מועמדים השבוע
+        </div>
       </div>
-      <div class="stat-label">
-       מועמדים השבוע
+      <div class="stat-card">
+        <div class="stat-number">
+        2.3
+        </div>
+        <div class="stat-label">
+         ימים זמן טיפול ממוצע
+        </div>
       </div>
-     </div>
-     <div class="stat-card">
-      <div class="stat-number">
-       2.3
+      <div class="stat-card">
+        <div class="stat-number">
+        78%
+        </div>
+        <div class="stat-label">
+         דיוק אלגוריתם
+        </div>
       </div>
-      <div class="stat-label">
-       ימים זמן טיפול ממוצע
       </div>
-     </div>
-     <div class="stat-card">
-      <div class="stat-number">
-       78%
+      <section>
+      <h2 class="section-title" id="teamPerformanceTitle">📊 ביצועי צוות הגיוס</h2>
+      <div class="jobs-table">
+        <div class="table-header">
+        <div class="job-info">
+          <div>
+           משרה ומגייס
+          </div>
+          <div>
+           טופלו/ממתינים
+          </div>
+          <div>
+           זמן טיפול ממוצע
+          </div>
+          <div>
+           זמן תגובה ממוצע
+          </div>
+          <div>
+           אחוז קבלה
+          </div>
+          <div>
+           יעילות סינון
+          </div>
+        </div>
+        </div>
+        <div class="table-row">
+        <div class="job-info">
+          <div>
+          <div class="job-title">
+          מפתח  Full Stack
+          </div>
+          <div class="job-recruiter">
+           רחל כהן
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            18/6
+          </div>
+          <div class="metric-label">
+           טופלו/ממתינים
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            1.8 ימים
+          </div>
+          <div class="metric-label">
+           זמן טיפול
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            3.2 ימים
+          </div>
+          <div class="metric-label">
+           זמן תגובה
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            72%
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 72%"></div>
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            85%
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 85%"></div>
+          </div>
+          </div>
+        </div>
+        </div>
+        <div class="table-row">
+        <div class="job-info">
+          <div>
+          <div class="job-title">
+           מנהל פרויקטים
+          </div>
+          <div class="job-recruiter">
+           דני לוי
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            12/4
+          </div>
+          <div class="metric-label">
+           טופלו/ממתינים
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            2.1 ימים
+          </div>
+          <div class="metric-label">
+           זמן טיפול
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            2.8 ימים
+          </div>
+          <div class="metric-label">
+           זמן תגובה
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            68%
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 68%"></div>
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            79%
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 79%"></div>
+          </div>
+          </div>
+        </div>
+        </div>
+        <div class="table-row">
+         <div class="job-info">
+          <div>
+          <div class="job-title">
+           מעצב UX/UI
+          </div>
+          <div class="job-recruiter">
+           שרה אברהם
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            25/9
+          </div>
+          <div class="metric-label">
+           טופלו/ממתינים
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            1.5 ימים
+          </div>
+          <div class="metric-label">
+           זמן טיפול
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+            4.1 ימים
+          </div>
+          <div class="metric-label">
+           זמן תגובה
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+           81%
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 81%"></div>
+          </div>
+          </div>
+          <div>
+          <div class="metric-value">
+           92%
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 92%"></div>
+          </div>
+          </div>
+        </div>
+        </div>
       </div>
-      <div class="stat-label">
-       דיוק אלגוריתם
+      </section>
+      <section>
+      <div class="chart-container">
+        <h3 class="chart-title">יעילות סינון לפי מגייס</h3>
+        <div class="chart">
+         <div class="chart-bar">
+          <div class="bar" style="height: 85px;">
+          <div class="bar-value">
+            85%
+          </div>
+          </div>
+          <div class="bar-label">
+           רחל כהן
+          </div>
+        </div>
+        <div class="chart-bar">
+          <div class="bar" style="height: 79px;">
+          <div class="bar-value">
+            79%
+          </div>
+          </div>
+          <div class="bar-label">
+           דני לוי
+          </div>
+        </div>
+        <div class="chart-bar">
+          <div class="bar" style="height: 92px;">
+          <div class="bar-value">
+           92%
+          </div>
+          </div>
+          <div class="bar-label">
+           שרה אברהם
+          </div>
+        </div>
+        <div class="chart-bar">
+          <div class="bar" style="height: 76px;">
+          <div class="bar-value">
+            76%
+          </div>
+          </div>
+          <div class="bar-label">
+           יוסי דוד
+          </div>
+        </div>
+        <div class="chart-bar">
+          <div class="bar" style="height: 88px;">
+          <div class="bar-value">
+            88%
+          </div>
+          </div>
+          <div class="bar-label">
+           מיכל רון
+          </div>
+        </div>
+        </div>
       </div>
-     </div>
-    </div>
-    <section>
-     <h2 class="section-title" id="teamPerformanceTitle">📊 ביצועי צוות הגיוס</h2>
-     <div class="jobs-table">
-      <div class="table-header">
-       <div class="job-info">
-        <div>
-         משרה ומגייס
+      </section>
+      <section>
+      <h2 class="section-title" id="jobsOverviewTitle">🎯 פידבק על דיוק האלגוריתם</h2>
+      <div class="feedback-section">
+        <div class="feedback-item">
+        <div class="candidate-info">
+          <div class="candidate-name">
+           אלון שמיר
+          </div>
+          <div class="candidate-job">
+           מפתח Full Stack - רחל כהן
+          </div>
         </div>
-        <div>
-         טופלו/ממתינים
+        <div class="feedback-score"><span class="score-badge score-high">ציון גבוה מדי</span> <span>92% → 75%</span>
         </div>
-        <div>
-         זמן טיפול ממוצע
+        <div class="feedback-buttons"><button class="feedback-btn btn-too-high" onclick="sendFeedback('high', 'אלון שמיר')">ציון גבוה מדי</button> <button class="feedback-btn btn-send" id="sendFeedbackBtn" onclick="sendFeedback('send', 'אלון שמיר')">שלח פידבק</button>
         </div>
-        <div>
-         זמן תגובה ממוצע
         </div>
-        <div>
-         אחוז קבלה
+        <div class="feedback-item">
+        <div class="candidate-info">
+          <div class="candidate-name">
+           נועה לוי
+          </div>
+          <div class="candidate-job">
+           מעצב UX/UI - שרה אברהם
+          </div>
         </div>
-        <div>
-         יעילות סינון
+        <div class="feedback-score"><span class="score-badge score-low">ציון נמוך מדי</span> <span>65% → 85%</span>
         </div>
-       </div>
+        <div class="feedback-buttons"><button class="feedback-btn btn-too-low" onclick="sendFeedback('low', 'נועה לוי')">ציון נמוך מדי</button> <button class="feedback-btn btn-send" onclick="sendFeedback('send', 'נועה לוי')">שלח פידבק</button>
+        </div>
+        </div>
+        <div class="feedback-item">
+        <div class="candidate-info">
+          <div class="candidate-name">
+           רון כהן
+          </div>
+          <div class="candidate-job">
+           מנהל פרויקטים - דני לוי
+          </div>
+        </div>
+        <div class="feedback-score"><span class="score-badge score-high">ציון גבוה מדי</span> <span>88% → 70%</span>
+        </div>
+        <div class="feedback-buttons"><button class="feedback-btn btn-too-high" onclick="sendFeedback('high', 'רון כהן')">ציון גבוה מדי</button> <button class="feedback-btn btn-send" onclick="sendFeedback('send', 'רון כהן')">שלח פידבק</button>
+        </div>
+        </div>
       </div>
-      <div class="table-row">
-       <div class="job-info">
-        <div>
-         <div class="job-title">
-          מפתח Full Stack
-         </div>
-         <div class="job-recruiter">
-          רחל כהן
-         </div>
+      </section>
+    </div> <!-- סוף dashboardSection -->
+    <section id="teamManagementSection" style="display:none;">
+      <h2 class="section-title">👥 ניהול צוות גיוס</h2>
+
+     <!-- טבלת צוות -->
+      <div class="jobs-table">
+        <div class="table-header">
+          <div class="job-info">
+            <div>אימייל משתמש</div>
+            <div>תפקיד</div>
+            <div>חברה</div>
+            <div>סטטוס</div>
+            <div>הרשאה</div>
+            <div>פעולות</div>
+          </div>
         </div>
-        <div>
-         <div class="metric-value">
-          18/6
-         </div>
-         <div class="metric-label">
-          טופלו/ממתינים
-         </div>
+        <div id="teamUsersBody">
+         <!-- שורות הצוות יוזרקו כאן ב-JS -->
         </div>
-        <div>
-         <div class="metric-value">
-          1.8 ימים
-         </div>
-         <div class="metric-label">
-          זמן טיפול
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          3.2 ימים
-         </div>
-         <div class="metric-label">
-          זמן תגובה
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          72%
-         </div>
-         <div class="progress-bar">
-          <div class="progress-fill" style="width: 72%"></div>
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          85%
-         </div>
-         <div class="progress-bar">
-          <div class="progress-fill" style="width: 85%"></div>
-         </div>
-        </div>
-       </div>
       </div>
-      <div class="table-row">
-       <div class="job-info">
-        <div>
-         <div class="job-title">
-          מנהל פרויקטים
-         </div>
-         <div class="job-recruiter">
-          דני לוי
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          12/4
-         </div>
-         <div class="metric-label">
-          טופלו/ממתינים
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          2.1 ימים
-         </div>
-         <div class="metric-label">
-          זמן טיפול
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          2.8 ימים
-         </div>
-         <div class="metric-label">
-          זמן תגובה
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          68%
-         </div>
-         <div class="progress-bar">
-          <div class="progress-fill" style="width: 68%"></div>
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          79%
-         </div>
-         <div class="progress-bar">
-          <div class="progress-fill" style="width: 79%"></div>
-         </div>
-        </div>
-       </div>
+
+     <!-- טופס יצירת משתמש צוות חדש -->
+      <div class="feedback-section" style="margin-top: 30px;">
+        <h3 class="section-title" style="font-size: 20px;">➕ יצירת משתמש צוות חדש</h3>
+        <form id="teamUserForm" onsubmit="submitTeamUser(event)">
+          <div class="team-form-grid">
+            <div>
+              <label class="metric-label" style="display:block; margin-bottom:4px;">אימייל משתמש *</label>
+              <input id="teamUserEmail" type="email" required
+                 style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0;">
+            </div>
+            <div>
+              <label class="metric-label" style="display:block; margin-bottom:4px;">סיסמה ראשונית *</label>
+              <input id="teamUserPassword" type="password" required
+                 style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0;">
+            </div>
+            <div>
+              <label class="metric-label" style="display:block; margin-bottom:4px;">תפקיד במערכת *</label>
+              <select id="teamUserRole"
+                  style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0;">
+                <option value="">בחרי תפקיד</option>
+                <option value="HR_MANAGER">מנהל/ת HR</option>
+                <option value="RECRUITER">מגייס/ת</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="teamUserSubmitBtn" type="submit"
+                  class="feedback-btn btn-send"
+                  style="margin-top: 16px;">
+           יצירת משתמש צוות
+          </button>
+        </form>
       </div>
-      <div class="table-row">
-       <div class="job-info">
-        <div>
-         <div class="job-title">
-          מעצב UX/UI
-         </div>
-         <div class="job-recruiter">
-          שרה אברהם
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          25/9
-         </div>
-         <div class="metric-label">
-          טופלו/ממתינים
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          1.5 ימים
-         </div>
-         <div class="metric-label">
-          זמן טיפול
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          4.1 ימים
-         </div>
-         <div class="metric-label">
-          זמן תגובה
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          81%
-         </div>
-         <div class="progress-bar">
-          <div class="progress-fill" style="width: 81%"></div>
-         </div>
-        </div>
-        <div>
-         <div class="metric-value">
-          92%
-         </div>
-         <div class="progress-bar">
-          <div class="progress-fill" style="width: 92%"></div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
     </section>
-    <section>
-     <div class="chart-container">
-      <h3 class="chart-title">יעילות סינון לפי מגייס</h3>
-      <div class="chart">
-       <div class="chart-bar">
-        <div class="bar" style="height: 85px;">
-         <div class="bar-value">
-          85%
-         </div>
-        </div>
-        <div class="bar-label">
-         רחל כהן
-        </div>
-       </div>
-       <div class="chart-bar">
-        <div class="bar" style="height: 79px;">
-         <div class="bar-value">
-          79%
-         </div>
-        </div>
-        <div class="bar-label">
-         דני לוי
-        </div>
-       </div>
-       <div class="chart-bar">
-        <div class="bar" style="height: 92px;">
-         <div class="bar-value">
-          92%
-         </div>
-        </div>
-        <div class="bar-label">
-         שרה אברהם
-        </div>
-       </div>
-       <div class="chart-bar">
-        <div class="bar" style="height: 76px;">
-         <div class="bar-value">
-          76%
-         </div>
-        </div>
-        <div class="bar-label">
-         יוסי דוד
-        </div>
-       </div>
-       <div class="chart-bar">
-        <div class="bar" style="height: 88px;">
-         <div class="bar-value">
-          88%
-         </div>
-        </div>
-        <div class="bar-label">
-         מיכל רון
-        </div>
-       </div>
-      </div>
-     </div>
-    </section>
-    <section>
-     <h2 class="section-title" id="jobsOverviewTitle">🎯 פידבק על דיוק האלגוריתם</h2>
-     <div class="feedback-section">
-      <div class="feedback-item">
-       <div class="candidate-info">
-        <div class="candidate-name">
-         אלון שמיר
-        </div>
-        <div class="candidate-job">
-         מפתח Full Stack - רחל כהן
-        </div>
-       </div>
-       <div class="feedback-score"><span class="score-badge score-high">ציון גבוה מדי</span> <span>92% → 75%</span>
-       </div>
-       <div class="feedback-buttons"><button class="feedback-btn btn-too-high" onclick="sendFeedback('high', 'אלון שמיר')">ציון גבוה מדי</button> <button class="feedback-btn btn-send" id="sendFeedbackBtn" onclick="sendFeedback('send', 'אלון שמיר')">שלח פידבק</button>
-       </div>
-      </div>
-      <div class="feedback-item">
-       <div class="candidate-info">
-        <div class="candidate-name">
-         נועה לוי
-        </div>
-        <div class="candidate-job">
-         מעצב UX/UI - שרה אברהם
-        </div>
-       </div>
-       <div class="feedback-score"><span class="score-badge score-low">ציון נמוך מדי</span> <span>65% → 85%</span>
-       </div>
-       <div class="feedback-buttons"><button class="feedback-btn btn-too-low" onclick="sendFeedback('low', 'נועה לוי')">ציון נמוך מדי</button> <button class="feedback-btn btn-send" onclick="sendFeedback('send', 'נועה לוי')">שלח פידבק</button>
-       </div>
-      </div>
-      <div class="feedback-item">
-       <div class="candidate-info">
-        <div class="candidate-name">
-         רון כהן
-        </div>
-        <div class="candidate-job">
-         מנהל פרויקטים - דני לוי
-        </div>
-       </div>
-       <div class="feedback-score"><span class="score-badge score-high">ציון גבוה מדי</span> <span>88% → 70%</span>
-       </div>
-       <div class="feedback-buttons"><button class="feedback-btn btn-too-high" onclick="sendFeedback('high', 'רון כהן')">ציון גבוה מדי</button> <button class="feedback-btn btn-send" onclick="sendFeedback('send', 'רון כהן')">שלח פידבק</button>
-       </div>
-      </div>
-     </div>
-    </section>
+
+
    </main>
   </div>
   <script>
@@ -997,25 +1067,171 @@
       sidebar.classList.toggle('open');
     }
 
+    function showSection(section) {
+      const dashboard = document.getElementById('dashboardSection');
+      const team = document.getElementById('teamManagementSection');
+
+      if (!dashboard || !team) return;
+
+      if (section === 'team') {
+        dashboard.style.display = 'none';
+        team.style.display = 'block';
+      } else {
+        // ברירת מחדל – דשבורד
+        dashboard.style.display = 'block';
+        team.style.display = 'none';
+      }
+    }
+
+
+        async function fetchTeamUsers() {
+      const body = document.getElementById('teamUsersBody');
+      if (!body) return;
+
+      body.innerHTML = '<div class="table-row"><div>טוען משתמשים...</div></div>';
+
+      try {
+        const res = await fetch('/api/hr/team-users');
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          body.innerHTML = '<div class="table-row"><div style="color:#e53e3e;">שגיאה בטעינת משתמשי הצוות</div></div>';
+          return;
+        }
+
+        const users = Array.isArray(data.users) ? data.users : [];
+
+        if (users.length === 0) {
+          body.innerHTML = '<div class="table-row"><div>אין עדיין משתמשים בצוות</div></div>';
+          return;
+        }
+
+        body.innerHTML = '';
+
+        users.forEach(user => {
+          const row = document.createElement('div');
+          row.className = 'table-row';
+
+          const roleLabel =
+            user.role === 'HR_LEAD'
+              ? 'ראש צוות HR'
+              : user.role === 'RECRUITER'
+              ? 'מגייס/ת'
+              : (user.role || '');
+
+          const statusBadge = `
+            <span style="background:#c6f6d5; color:#22543d; padding:4px 8px; border-radius:12px; font-size:12px;">
+              פעיל
+            </span>
+          `;
+
+          row.innerHTML = `
+            <div class="job-info">
+              <div>
+                <div class="metric-value">${user.email}</div>
+                <div class="metric-label">${user.name || ''}</div>
+              </div>
+              <div>${roleLabel}</div>
+              <div>${user.company_name || ''}</div>
+              <div>${statusBadge}</div>
+              <div></div>
+              <div></div>
+            </div>
+          `;
+
+          body.appendChild(row);
+        });
+      } catch (err) {
+        console.error('שגיאה בטעינת משתמשים:', err);
+        body.innerHTML = '<div class="table-row"><div style="color:#e53e3e;">שגיאה בתקשורת עם השרת</div></div>';
+      }
+    }
+
+    async function submitTeamUser(event) {
+      event.preventDefault();
+
+      const emailInput = document.getElementById('teamUserEmail');
+      const passwordInput = document.getElementById('teamUserPassword');
+      const roleSelect = document.getElementById('teamUserRole');
+      const submitBtn = document.getElementById('teamUserSubmitBtn');
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+      const role = roleSelect.value;
+
+      if (!email || !password || !role) {
+        showMessage('חובה למלא אימייל, סיסמה ותפקיד');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'יוצר...';
+
+      try {
+        const res = await fetch('/api/hr/team-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, role }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+          showMessage(data.message || 'שגיאה ביצירת משתמש הצוות');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'יצירת משתמש צוות';
+          return;
+        }
+
+        showMessage('משתמש הצוות נוצר בהצלחה');
+
+        // איפוס טופס
+        emailInput.value = '';
+        passwordInput.value = '';
+        roleSelect.value = '';
+
+        // רענון רשימת הצוות
+        await fetchTeamUsers();
+      } catch (err) {
+        console.error('שגיאה ביצירת משתמש צוות:', err);
+        showMessage('שגיאה בתקשורת עם השרת');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'יצירת משתמש צוות';
+      }
+    }
+
+
+    
+
+
     function showDashboard() {
       setActiveMenuItem(0);
+      showSection('dashboard');
       showMessage('מציג דשבורד ראשי');
     }
 
     function showReports() {
       setActiveMenuItem(1);
+      // כרגע אין מסך דוחות נפרד – נשאיר את הדשבורד פתוח:
+      showSection('dashboard');
       showMessage('מציג דוחות מפורטים');
     }
 
     function showTeamManagement() {
       setActiveMenuItem(2);
+      showSection('team');
+      fetchTeamUsers();
       showMessage('מציג ניהול צוות');
     }
 
     function showSettings() {
       setActiveMenuItem(3);
+      // גם כאן – אפשר להשאיר דשבורד / להוסיף בהמשך מסך הגדרות
+      showSection('dashboard');
       showMessage('מציג הגדרות מערכת');
     }
+
 
     function setActiveMenuItem(index) {
       const menuItems = document.querySelectorAll('.menu-item');

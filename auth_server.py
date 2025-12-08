@@ -288,7 +288,129 @@ def list_jobs():
     ]
 
     return jsonify({"success": True, "jobs": jobs})
+# ----------------- רשימת מועמדים לכל משרה -----------------
 
+@app.route("/api/jobs/<int:job_id>/candidates", methods=["GET"])
+def list_job_candidates(job_id):
+    """
+    מחזיר רשימת מועמדים למשרה מסוימת.
+
+    הרשאות:
+    - DEVOPS → רואה את כל המשרות.
+    - HR_LEAD  → רואה משרות שבהן הוא manager_id.
+    - HR_MANAGER / RECRUITER → רואים משרות של המנהל שלהם (users.manager_id).
+    """
+
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    user_id = session["user_id"]
+    role = session.get("role")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # קובע עבור מי מותר לראות את המשרה, בדיוק כמו ב-/api/jobs
+    manager_key = None
+
+    if role == "DEVOPS":
+        manager_key = None  # DEVOPS רואה הכל
+
+    elif role == "HR_LEAD":
+        manager_key = user_id
+
+    elif role in ("HR_MANAGER", "RECRUITER"):
+        cur.execute("SELECT manager_id FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        if row:
+            manager_key = row["manager_id"]
+    else:
+        conn.close()
+        return jsonify(
+            {"success": False, "message": "אין לך הרשאה לצפות במועמדים למשרה"}
+        ), 403
+
+    # בודקים שהמשרה קיימת ושהיא שייכת למנהל הרלוונטי
+    if manager_key is not None:
+        cur.execute(
+            """
+            SELECT id, title, manager_id
+            FROM jobs
+            WHERE id = ? AND is_active = 1 AND manager_id = ?
+            """,
+            (job_id, manager_key),
+        )
+    else:
+        # DEVOPS – רק לוודא שהמשרה קיימת ופעילה
+        cur.execute(
+            """
+            SELECT id, title, manager_id
+            FROM jobs
+            WHERE id = ? AND is_active = 1
+            """,
+            (job_id,),
+        )
+
+    job_row = cur.fetchone()
+    if job_row is None:
+        conn.close()
+        return jsonify(
+            {"success": False, "message": "המשרה לא נמצאה או שאין לך הרשאה אליה"}
+        ), 404
+
+    # עכשיו מביאים את המועמדים למשרה הזו
+    cur.execute(
+        """
+        SELECT
+            jc.cv_id,
+            jc.linked_at,
+            cs.final_score,
+            cs.age,
+            cs.age_score,
+            cs.distance_score,
+            cs.must_requirements_score,
+            cs.years_experience_score,
+            cs.nice_to_have_score
+        FROM job_candidates AS jc
+        LEFT JOIN cv_scores AS cs
+          ON jc.cv_id = cs.cv_id
+        WHERE jc.job_id = ?
+        ORDER BY jc.linked_at DESC
+        """,
+        (job_id,),
+    )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    candidates = []
+    for row in rows:
+        # אם אין עדיין סקורינג, חלק מהשדות יהיו None – זה בסדר
+        candidates.append(
+            {
+                "cv_id": row["cv_id"],
+                "id": row["cv_id"],  # כדי שהפרונט יוכל להשתמש כמו בדמו
+                "name": f"מועמד/ת {row['cv_id']}",  # אפשר להחליף לשם אמיתי אם יש בטבלת candidates
+                "age": row["age"],
+                "matchScore": row["final_score"],
+                "linked_at": row["linked_at"],
+                "scores": {
+                    "age_score": row["age_score"],
+                    "distance_score": row["distance_score"],
+                    "must_requirements_score": row["must_requirements_score"],
+                    "years_experience_score": row["years_experience_score"],
+                    "nice_to_have_score": row["nice_to_have_score"],
+                },
+            }
+        )
+
+    return jsonify(
+        {
+            "success": True,
+            "job": {"id": job_row["id"], "title": job_row["title"]},
+            "candidates": candidates,
+        }
+    )
 
 # ----------------- דשבורדים לפי תפקיד -----------------
 
@@ -801,7 +923,7 @@ def api_reject_user(user_id):
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = dbutil.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 

@@ -705,6 +705,35 @@
     let currentCandidateId = null;
     let allCandidates = [];
 
+        // ממפה מועמד מה-API לפורמט שה-UI של הדשבורד מבין
+    function mapCandidateFromApi(apiCandidate) {
+      const scores = apiCandidate.scores || {};
+
+      const hasMissingScores = [
+        'age_score',
+        'distance_score',
+        'must_requirements_score',
+        'years_experience_score',
+        'nice_to_have_score',
+      ].some(key => scores[key] == null);   // null או undefined
+
+      return {
+        id: apiCandidate.id,
+        name: apiCandidate.name || `מועמד/ת ${apiCandidate.cv_id}`,
+        age: apiCandidate.age,
+        experience: null,              // אין עדיין נתון אמיתי
+        location: 'לא צוין',
+        matchScore: apiCandidate.matchScore ?? 0,
+        isNew: true,
+        status: 'new',
+        scores,
+        hasMissingScores,              // ⬅️ דגל חדש לפרונט
+        linked_at: apiCandidate.linked_at,
+      };
+    }
+
+
+
     function renderJobs() {
       const jobsGrid = document.getElementById('jobsGrid');
       jobsGrid.innerHTML = '';
@@ -744,20 +773,43 @@
     } 
 
 
-    function showJobDetails(jobId) {
+        // מציג את פרטי המשרה + טוען מועמדים אמיתיים מה-API, עם fallback לדמו
+    async function showJobDetails(jobId) {
       currentJobId = jobId;
-      const job = jobsData.find(j => j.id === jobId);
+      const job = jobsData.find(j => j.id === jobId) || { title: '' };
 
+      // החלפת תצוגות
       document.getElementById('dashboardView').style.display = 'none';
       document.getElementById('jobDetailsView').style.display = 'block';
       document.getElementById('candidateDetailView').style.display = 'none';
 
-      document.getElementById('jobDetailsTitle').textContent = `מועמדים למשרת ${job.title}`;
+      document.getElementById('jobDetailsTitle').textContent =
+        `מועמדים למשרת ${job.title}`;
 
-      allCandidates = candidatesData[jobId] || [];
+      let candidates = [];
+
+      // 🛰️ קודם מנסים להביא מועמדים אמיתיים מהשרת
+      try {
+        const res = await fetch(`/api/jobs/${jobId}/candidates`);
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success && Array.isArray(data.candidates)) {
+          candidates = data.candidates.map(mapCandidateFromApi);
+        }
+      } catch (err) {
+        console.error('שגיאה בטעינת מועמדים מה-API:', err);
+      }
+
+      // 🧪 אם אין מועמדים אמיתיים – נופלים לדמו כדי שתמיד תראי משהו
+      if (!candidates.length) {
+        candidates = candidatesData[jobId] || [];
+      }
+
+      allCandidates = candidates;
       renderCandidates(allCandidates);
       attachFiltersHandlers();
     }
+
 
     function renderCandidates(candidates) {
       const candidatesList = document.getElementById('candidatesList');
@@ -771,8 +823,9 @@
         candidateCard.innerHTML = `
           <div class="candidate-header">
             <span class="candidate-name">${candidate.name}</span>
-            <span class="match-score">${candidate.matchScore}% התאמה</span>
-          </div>
+            <span class="match-score">
+              ${candidate.matchScore}% התאמה${candidate.hasMissingScores ? ' ?' : ''}
+            </span>
           <div class="candidate-info">
             <div>גיל: ${candidate.age}</div>
             <div>ניסיון: ${candidate.experience} שנים</div>
@@ -845,7 +898,9 @@
       document.getElementById('candidateProfile').innerHTML = `
         <div class="profile-header">
           <div class="profile-name">${candidate.name}</div>
-          <div class="profile-match">${candidate.matchScore}% התאמה למשרה</div>
+          <div class="profile-match">
+            ${candidate.matchScore}% התאמה למשרה${candidate.hasMissingScores ? ' ?' : ''}
+          </div>
         </div>
 
         <div class="profile-sections">

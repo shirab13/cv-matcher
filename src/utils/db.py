@@ -34,15 +34,6 @@ CREATE TABLE IF NOT EXISTS cv_scores (
   FOREIGN KEY(cv_id) REFERENCES candidates(cv_id)
 );
 
--- 🔹 טבלת קישור בין משרה (מה-DB של auth_server) לבין CV (מהטבלה candidates)
-CREATE TABLE IF NOT EXISTS job_candidates (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  job_id     INTEGER NOT NULL,   -- זה ה-id של המשרה מה-DB של auth_server
-  cv_id      INTEGER NOT NULL,   -- זה ה-cv_id מהטבלה candidates
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  FOREIGN KEY (cv_id) REFERENCES candidates(cv_id),
-  UNIQUE(job_id, cv_id)          -- שלא יהיה אותו CV פעמיים לאותה משרה
-);
 """
 
 
@@ -86,9 +77,55 @@ def upsert_age_score(
     reason: str,
     confidence: str,
     factor: float | None,
-    final_score: float | None = None,
+    final_score: float | None = None,   # הפרמטר נשאר בשביל תאימות לאחור
 ):
-    """מעדכן/יוצר רשומת ציון גיל עבור cv_id נתון."""
+    """
+    מעדכן/יוצר רשומת ציון גיל עבור cv_id נתון
+    + מחשב final_score משוקלל כך ש-NULL נחשב כציון מלא.
+    """
+
+    # 1. מביאים את הסקורים הקיימים (אם יש)
+    cur = con.execute(
+        """
+        SELECT
+          age_score,
+          distance_score,
+          must_requirements_score,
+          years_experience_score,
+          nice_to_have_score
+        FROM cv_scores
+        WHERE cv_id = ?
+        """,
+        (cv_id,),
+    )
+    row = cur.fetchone()
+
+    if row:
+        # row יכול להיות tuple או sqlite3.Row – בשני המקרים אינדקסים עובדים
+        existing_age, existing_dist, existing_must, existing_years, existing_nice = row
+    else:
+        existing_age = existing_dist = existing_must = existing_years = existing_nice = None
+
+    # 2. קובעים את הערכים העדכניים לכל סעיף
+    age_val   = age_score if age_score is not None else existing_age
+    dist_val  = existing_dist
+    must_val  = existing_must
+    years_val = existing_years
+    nice_val  = existing_nice
+
+    # 3. NULL → ציון מלא
+    def full_or(value, full):
+        return full if value is None else value
+
+    age_pts   = full_or(age_val,   10.0)
+    dist_pts  = full_or(dist_val,  10.0)
+    must_pts  = full_or(must_val,  40.0)
+    years_pts = full_or(years_val, 20.0)
+    nice_pts  = full_or(nice_val,  20.0)
+
+    computed_final = age_pts + dist_pts + must_pts + years_pts + nice_pts
+
+    # 4. שמירה בטבלה (שימי לב: final_score תמיד נקבע לערך שחישבנו)
     con.execute(
         """
         INSERT INTO cv_scores (
@@ -97,18 +134,20 @@ def upsert_age_score(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(cv_id) DO UPDATE SET
-            age_score=excluded.age_score,
-            birth_year=excluded.birth_year,
-            age=excluded.age,
-            age_reason=excluded.age_reason,
-            age_confidence=excluded.age_confidence,
-            age_factor=excluded.age_factor,
-            final_score=COALESCE(excluded.final_score, cv_scores.final_score),
-            updated_at=(datetime('now','localtime'))
+            age_score       = excluded.age_score,
+            birth_year      = excluded.birth_year,
+            age             = excluded.age,
+            age_reason      = excluded.age_reason,
+            age_confidence  = excluded.age_confidence,
+            age_factor      = excluded.age_factor,
+            final_score     = excluded.final_score,
+            updated_at      = (datetime('now','localtime'))
         """,
-        (cv_id, age_score, birth_year, age, reason, confidence, factor, final_score),
+        (cv_id, age_score, birth_year, age, reason, confidence, factor, computed_final),
     )
     con.commit()
+
+
 def link_cv_to_job(con: sqlite3.Connection, cv_id: int, job_id: int):
     """
     קושר CV למשרה (job_id מגיע מטבלת jobs ב-auth_server).

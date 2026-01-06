@@ -73,6 +73,59 @@ def _normalize_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
+HE_PREFIXES = ("ו", "ה", "ב", "ל", "כ", "מ", "ש")
+
+ALIASES = {
+    "english": "אנגלית",
+    "eng": "אנגלית",
+    "hebrew": "עברית",
+    "ivrit": "עברית",
+    
+    # Python
+    "python": "פייתון",
+    "py": "פייתון",
+    "פייתון": "פייתון",
+
+    # JavaScript / TypeScript
+    "javascript": "גאווהסקריפט",
+    "js": "גאווהסקריפט",
+    "typescript": "טייפסקריפט",
+    "ts": "טייפסקריפט",
+
+    # React / Node
+    "react": "react",
+    "reactjs": "react",
+    "node": "node",
+    "nodejs": "node",
+    "node.js": "node",
+    "express": "express",
+}
+
+def _normalize_token(token: str) -> str:
+    token = token.strip().lower()
+
+    # מסירים סימנים כמו נקודות/פסיקים מסביב (למשל node.js, python,)
+    token = token.strip(".,:;()[]{}<>\"'")
+
+    # normalize some known punctuation cases
+    token = token.replace("nodejs", "node")
+    token = token.replace("node.js", "node")
+    token = token.replace("reactjs", "react")
+
+    # הסרת תחיליות בעברית: "באנגלית" -> "אנגלית", "בפייתון" -> "פייתון"
+    changed = True
+    while changed and len(token) >= 3:
+        changed = False
+        for p in HE_PREFIXES:
+            if token.startswith(p) and len(token) >= 4:
+                token = token[1:]
+                changed = True
+                break
+
+    # מפעילים aliases
+    return ALIASES.get(token, token)
+
+
 
 
 def _extract_keywords(text: str) -> set[str]:
@@ -96,12 +149,69 @@ def _extract_keywords(text: str) -> set[str]:
     # \w תופס גם אותיות בעברית בפייתון (יוניקוד)
     words = re.findall(r"\w+", text)
 
-    keywords = {
-        w for w in words
-        if len(w) >= 3 and w not in stopwords
-    }
+    keywords = set()
+    for w in words:
+        w = _normalize_token(w)
+        if len(w) >= 3 and w not in stopwords:
+            keywords.add(w)
 
     return keywords
+
+
+
+
+#פונקציה שמחזירה Coverage (K,N) במקום 0–10
+def requirements_coverage(cv_text: str, requirements_text: str) -> tuple[int, int]:
+    """
+    מחזירה (covered, total)
+    כל שורה/בולט בדרישות = דרישה אחת.
+    דרישה נחשבת מכוסה אם לפחות חצי מהמילים המשמעותיות שלה מופיעות בקו"ח.
+    """
+    if not requirements_text:
+        return (0, 0)
+
+    raw_reqs = re.split(r"[\n;\u2022\-•]+", requirements_text)
+    req_lines = [r.strip() for r in raw_reqs if r.strip()]
+    if not req_lines:
+        return (0, 0)
+
+    cv_keywords = _extract_keywords(cv_text)
+    if not cv_keywords:
+        return (0, len(req_lines))
+
+    covered = 0
+    for line in req_lines:
+        req_keywords = _extract_keywords(line)
+        if not req_keywords:
+            continue
+        matched = sum(1 for w in req_keywords if w in cv_keywords)
+        ratio = matched / len(req_keywords)
+        if ratio >= 0.5:
+            covered += 1
+
+    return (covered, len(req_lines))
+
+
+#פונקציה שמתרגמת Coverage לנקודות (40/10)
+def requirements_points(cv_text: str, must_text: str, nice_text: str | None) -> dict:
+    MUST_WEIGHT = 40.0
+    NICE_WEIGHT = 10.0
+
+    must_covered, must_total = requirements_coverage(cv_text, must_text)
+    must_points = 0.0 if must_total == 0 else MUST_WEIGHT * (must_covered / must_total)
+
+    nice_points = 0.0
+    nice_covered = 0
+    nice_total = 0
+    if nice_text and nice_text.strip():
+        nice_covered, nice_total = requirements_coverage(cv_text, nice_text)
+        nice_points = 0.0 if nice_total == 0 else NICE_WEIGHT * (nice_covered / nice_total)
+
+    return {
+        "must": {"covered": must_covered, "total": must_total, "points": round(must_points, 2)},
+        "nice": {"covered": nice_covered, "total": nice_total, "points": round(nice_points, 2)},
+        "requirements_points": round(must_points + nice_points, 2)
+    }
 
 
 def score_requirements_from_text(cv_text: str, requirements_text: str) -> float:
@@ -684,9 +794,11 @@ def devops_upload_cv():
             # 2. טקסט מתוך ה-CV האנונימי
             cv_text = extract_text_any(out_path) or ""
 
-            # 3. חישוב ציונים 0–10
-            must_score = score_requirements_from_text(cv_text, must_txt)
-            nice_score = score_requirements_from_text(cv_text, nice_txt) if nice_txt else None
+            # 3) חישוב נקודות דרישות לפי המשקלים שלך
+            req = requirements_points(cv_text, must_txt, nice_txt)
+
+            must_score = req["must"]["points"]          # 0–40
+            nice_score = req["nice"]["points"]          # 0–10 (או 0 אם אין nice)
 
             # 4. עדכון טבלת הציונים (cv_scores)
             cur.execute(

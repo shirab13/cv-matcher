@@ -43,6 +43,7 @@ from src.anonymizer import (
 )
 
 DB_PATH = "cv_matcher.db"
+print("DB ABS PATH =", os.path.abspath(DB_PATH))
 
 # איפה נשמור את הקו"ח הגולמי ואת הקובץ האנונימי
 INPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\input"
@@ -76,10 +77,19 @@ def _normalize_text(text: str) -> str:
 HE_PREFIXES = ("ו", "ה", "ב", "ל", "כ", "מ", "ש")
 
 ALIASES = {
+    # English
     "english": "אנגלית",
     "eng": "אנגלית",
+    "en": "אנגלית",
+    "האנגלית": "אנגלית",
+    "אנגלית": "אנגלית",
+
+    # Hebrew
     "hebrew": "עברית",
     "ivrit": "עברית",
+    "he": "עברית",
+    "העברית": "עברית",
+    "עברית": "עברית",
     
     # Python
     "python": "פייתון",
@@ -574,7 +584,7 @@ def list_job_candidates(job_id):
             cs.nice_to_have_score
         FROM job_candidates AS jc
         LEFT JOIN cv_scores AS cs
-          ON jc.cv_id = cs.cv_id
+            ON jc.cv_id = cs.cv_id AND jc.job_id = cs.job_id
         WHERE jc.job_id = ?
         ORDER BY jc.linked_at DESC
         """,
@@ -698,7 +708,7 @@ def devops_upload_cv():
         )
 
     # ----- POST: טיפול בהעלאת הקובץ -----
-    job_id = request.form.get("job_id")
+    job_id = int(request.form.get("job_id"))
     file = request.files.get("cv_file")
 
     # ולידציה בסיסית
@@ -762,6 +772,7 @@ def devops_upload_cv():
 
         dbutil.upsert_age_score(
             conn,
+            job_id,
             cv_id,
             age_score=age_score_points,
             birth_year=birth_year,
@@ -769,7 +780,6 @@ def devops_upload_cv():
             reason=reason,
             confidence="N/A",
             factor=penalty["factor"],
-            final_score=None,
         )
     except Exception as e:
         print("AGE SCORING ERROR (devops_upload_cv):", e)
@@ -806,11 +816,12 @@ def devops_upload_cv():
                 UPDATE cv_scores
                 SET must_requirements_score = ?,
                     nice_to_have_score     = ?
-                WHERE cv_id = ?
+                WHERE cv_id = ? AND job_id = ?
                 """,
-                (must_score, nice_score, cv_id),
+                (must_score, nice_score, cv_id, job_id),
             )
             conn.commit()
+            dbutil.recompute_final_score(conn, job_id, cv_id)
     except Exception as e:
         print("REQ SCORING ERROR (devops_upload_cv):", e)
         # לא מפיל את הבקשה – פשוט אין ציונים לדרישות
@@ -947,6 +958,7 @@ def upload_cv():
         # 5. שמירה לטבלת cv_scores דרך upsert_age_score
         dbutil.upsert_age_score(
             con,
+            int(job_id),
             cv_id,
             age_score=age_score_points,
             birth_year=birth_year,
@@ -954,7 +966,6 @@ def upload_cv():
             reason=reason,
             confidence="N/A",
             factor=penalty["factor"],
-            final_score=None,   # את הסקור הסופי המשולב תוסיפי בעתיד אם תרצי
         )
     except Exception as e:
         print("AGE SCORING ERROR:", e)
@@ -998,10 +1009,11 @@ def upload_cv():
                 UPDATE cv_scores
                 SET must_requirements_score = ?,
                     nice_to_have_score     = ?
-                WHERE cv_id = ?
+                WHERE cv_id = ? AND job_id = ?
                 """,
-                (must_score, nice_score, cv_id),
+                (must_score, nice_score, cv_id, job_id),
             )
+            dbutil.recompute_final_score(con, int(job_id), int(cv_id))
     except Exception as e:
         print("REQ SCORING ERROR (/api/upload_cv):", e)
 
@@ -1366,4 +1378,4 @@ if __name__ == "__main__":
     init_db()
 
     print("📂 משתמש בקובץ DB:", DB_PATH)
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=False, threaded=False)

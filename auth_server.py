@@ -1,6 +1,7 @@
 # auth_server.py
 import os
 import sqlite3
+import re
 from functools import wraps
 from flask import abort
 import traceback
@@ -57,7 +58,207 @@ def allowed_file(filename: str) -> bool:
     _, ext = os.path.splitext(filename.lower())
     return ext in ALLOWED_EXTENSIONS
 
+def _normalize_text(text: str) -> str:
+    """
+    מנרמל טקסט:
+    - לאותיות קטנות
+    - מסיר סימני פיסוק, משאיר אותיות/מספרים
+    - מרווחים בודדים
+    """
+    if not text:
+        return ""
+    text = text.lower()
+    # משאירים אותיות (עברית/אנגלית) ומספרים, שאר התווים -> רווח
+    text = re.sub(r"[^a-zA-Zא-ת0-9+/#]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
+HE_PREFIXES = ("ו", "ה", "ב", "ל", "כ", "מ", "ש")
+
+ALIASES = {
+    "english": "אנגלית",
+    "eng": "אנגלית",
+    "hebrew": "עברית",
+    "ivrit": "עברית",
+    
+    # Python
+    "python": "פייתון",
+    "py": "פייתון",
+    "פייתון": "פייתון",
+
+    # JavaScript / TypeScript
+    "javascript": "גאווהסקריפט",
+    "js": "גאווהסקריפט",
+    "typescript": "טייפסקריפט",
+    "ts": "טייפסקריפט",
+
+    # React / Node
+    "react": "react",
+    "reactjs": "react",
+    "node": "node",
+    "nodejs": "node",
+    "node.js": "node",
+    "express": "express",
+}
+
+def _normalize_token(token: str) -> str:
+    token = token.strip().lower()
+
+    # מסירים סימנים כמו נקודות/פסיקים מסביב (למשל node.js, python,)
+    token = token.strip(".,:;()[]{}<>\"'")
+
+    # normalize some known punctuation cases
+    token = token.replace("nodejs", "node")
+    token = token.replace("node.js", "node")
+    token = token.replace("reactjs", "react")
+
+    # הסרת תחיליות בעברית: "באנגלית" -> "אנגלית", "בפייתון" -> "פייתון"
+    changed = True
+    while changed and len(token) >= 3:
+        changed = False
+        for p in HE_PREFIXES:
+            if token.startswith(p) and len(token) >= 4:
+                token = token[1:]
+                changed = True
+                break
+
+    # מפעילים aliases
+    return ALIASES.get(token, token)
+
+
+
+
+def _extract_keywords(text: str) -> set[str]:
+    """
+    מוציא "מילים משמעותיות" מטקסט:
+    - מוריד לרשום אותיות קטנות
+    - מפצל למילים
+    - מסנן מילים קצרות ומילות עצירה בסיסיות
+    """
+    if not text:
+        return set()
+
+    text = text.lower()
+
+    # מילות עצירה בסיסיות (גם קצת עברית וגם אנגלית)
+    stopwords = {
+        "של", "עם", "על", "או", "אם", "לא", "כן", "וכן", "ו", "the", "and", "for",
+        "to", "in", "on", "a", "an", "is", "are", "of"
+    }
+
+    # \w תופס גם אותיות בעברית בפייתון (יוניקוד)
+    words = re.findall(r"\w+", text)
+
+    keywords = set()
+    for w in words:
+        w = _normalize_token(w)
+        if len(w) >= 3 and w not in stopwords:
+            keywords.add(w)
+
+    return keywords
+
+
+
+
+#פונקציה שמחזירה Coverage (K,N) במקום 0–10
+def requirements_coverage(cv_text: str, requirements_text: str) -> tuple[int, int]:
+    """
+    מחזירה (covered, total)
+    כל שורה/בולט בדרישות = דרישה אחת.
+    דרישה נחשבת מכוסה אם לפחות חצי מהמילים המשמעותיות שלה מופיעות בקו"ח.
+    """
+    if not requirements_text:
+        return (0, 0)
+
+    raw_reqs = re.split(r"[\n;\u2022\-•]+", requirements_text)
+    req_lines = [r.strip() for r in raw_reqs if r.strip()]
+    if not req_lines:
+        return (0, 0)
+
+    cv_keywords = _extract_keywords(cv_text)
+    if not cv_keywords:
+        return (0, len(req_lines))
+
+    covered = 0
+    for line in req_lines:
+        req_keywords = _extract_keywords(line)
+        if not req_keywords:
+            continue
+        matched = sum(1 for w in req_keywords if w in cv_keywords)
+        ratio = matched / len(req_keywords)
+        if ratio >= 0.5:
+            covered += 1
+
+    return (covered, len(req_lines))
+
+
+#פונקציה שמתרגמת Coverage לנקודות (40/10)
+def requirements_points(cv_text: str, must_text: str, nice_text: str | None) -> dict:
+    MUST_WEIGHT = 40.0
+    NICE_WEIGHT = 10.0
+
+    must_covered, must_total = requirements_coverage(cv_text, must_text)
+    must_points = 0.0 if must_total == 0 else MUST_WEIGHT * (must_covered / must_total)
+
+    nice_points = 0.0
+    nice_covered = 0
+    nice_total = 0
+    if nice_text and nice_text.strip():
+        nice_covered, nice_total = requirements_coverage(cv_text, nice_text)
+        nice_points = 0.0 if nice_total == 0 else NICE_WEIGHT * (nice_covered / nice_total)
+
+    return {
+        "must": {"covered": must_covered, "total": must_total, "points": round(must_points, 2)},
+        "nice": {"covered": nice_covered, "total": nice_total, "points": round(nice_points, 2)},
+        "requirements_points": round(must_points + nice_points, 2)
+    }
+
+
+def score_requirements_from_text(cv_text: str, requirements_text: str) -> float:
+    """
+    מקבלת טקסט קו\"ח (cv_text) וטקסט דרישות משרה (requirements_text – משפטים/בולטים)
+    ומחזירה ציון 0–10 לפי כמה דרישות כוסו ע\"י הקו\"ח.
+
+    כל שורה/בולט בדרישות נחשבת "דרישה".
+    דרישה נחשבת מכוסה אם לפחות חצי מהמילים המשמעותיות שלה מופיעות בקו\"ח.
+    """
+    if not requirements_text:
+        # אם לא הוגדרו דרישות – אין מה לבדוק, נחזיר ציון מלא
+        return 10.0
+
+    # מפרקים לדרישות – לפי שורות / נקודות / נקודות־פסיק
+    raw_reqs = re.split(r"[\n;\u2022\-•]+", requirements_text)
+    req_lines = [r.strip() for r in raw_reqs if r.strip()]
+
+    if not req_lines:
+        return 10.0
+
+    cv_keywords = _extract_keywords(cv_text)
+    if not cv_keywords:
+        # אין מילים משמעותיות בקו\"ח → לא כיסינו כלום
+        return 0.0
+
+    covered_reqs = 0
+
+    for line in req_lines:
+        req_keywords = _extract_keywords(line)
+        if not req_keywords:
+            # דרישה ללא מילים משמעותיות – נתייחס כאילו אין מה לבדוק
+            continue
+
+        # כמה מילים מהדרישה מופיעות בקו\"ח
+        matched = sum(1 for w in req_keywords if w in cv_keywords)
+        ratio = matched / len(req_keywords)
+
+        # אם חצי ומעלה מהמילים הופיעו בקו\"ח – נספור אותה כ"מכוסה"
+        if ratio >= 0.5:
+            covered_reqs += 1
+
+    if covered_reqs == 0:
+        return 0.0
+
+    score = (covered_reqs / len(req_lines)) * 10.0
+    return round(score, 2)
 # ----------------- ROUTES בסיס -----------------
 
 @app.route("/")
@@ -573,6 +774,46 @@ def devops_upload_cv():
     except Exception as e:
         print("AGE SCORING ERROR (devops_upload_cv):", e)
     # לא מפיל את ההעלאה – ממשיכים הלאה
+        # ---------- REQUIREMENTS SCORING (must / nice-to-have) ----------
+    try:
+        # 1. נביא את הדרישות של המשרה מה-DB
+        cur.execute(
+            """
+            SELECT must_requirements, nice_to_have_requirements
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
+
+        if job_row:
+            must_txt = job_row["must_requirements"] or ""
+            nice_txt = job_row["nice_to_have_requirements"] or ""
+
+            # 2. טקסט מתוך ה-CV האנונימי
+            cv_text = extract_text_any(out_path) or ""
+
+            # 3) חישוב נקודות דרישות לפי המשקלים שלך
+            req = requirements_points(cv_text, must_txt, nice_txt)
+
+            must_score = req["must"]["points"]          # 0–40
+            nice_score = req["nice"]["points"]          # 0–10 (או 0 אם אין nice)
+
+            # 4. עדכון טבלת הציונים (cv_scores)
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET must_requirements_score = ?,
+                    nice_to_have_score     = ?
+                WHERE cv_id = ?
+                """,
+                (must_score, nice_score, cv_id),
+            )
+            conn.commit()
+    except Exception as e:
+        print("REQ SCORING ERROR (devops_upload_cv):", e)
+        # לא מפיל את הבקשה – פשוט אין ציונים לדרישות
 
     # קישור למשרה בטבלת job_candidates
     try:
@@ -727,6 +968,43 @@ def upload_cv():
         """,
         (job_id, cv_id),
     )
+        # ---------- REQUIREMENTS SCORING (must / nice-to-have) ----------
+    try:
+        # 1. נביא את הדרישות של המשרה
+        cur.execute(
+            """
+            SELECT must_requirements, nice_to_have_requirements
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
+
+        if job_row:
+            must_txt = job_row["must_requirements"] or ""
+            nice_txt = job_row["nice_to_have_requirements"] or ""
+
+            # 2. טקסט מהקובץ האנונימי
+            cv_text = extract_text_any(output_path) or ""
+
+            # 3. חישוב ציונים
+            must_score = score_requirements_from_text(cv_text, must_txt)
+            nice_score = score_requirements_from_text(cv_text, nice_txt) if nice_txt else None
+
+            # 4. עדכון cv_scores
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET must_requirements_score = ?,
+                    nice_to_have_score     = ?
+                WHERE cv_id = ?
+                """,
+                (must_score, nice_score, cv_id),
+            )
+    except Exception as e:
+        print("REQ SCORING ERROR (/api/upload_cv):", e)
+
     con.commit()
     con.close()
 

@@ -210,10 +210,12 @@ def requirements_points(cv_text: str, must_text: str, nice_text: str | None) -> 
     must_covered, must_total = requirements_coverage(cv_text, must_text)
     must_points = 0.0 if must_total == 0 else MUST_WEIGHT * (must_covered / must_total)
 
-    nice_points = 0.0
-    nice_covered = 0
-    nice_total = 0
-    if nice_text and nice_text.strip():
+    # NICE: אם אין בכלל nice-to-have במשרה → נותנים את כל הנקודות
+    if not nice_text or not nice_text.strip():
+        nice_points = NICE_WEIGHT        # 10.0
+        nice_covered = 0
+        nice_total = 0
+    else:
         nice_covered, nice_total = requirements_coverage(cv_text, nice_text)
         nice_points = 0.0 if nice_total == 0 else NICE_WEIGHT * (nice_covered / nice_total)
 
@@ -1000,8 +1002,10 @@ def upload_cv():
             cv_text = extract_text_any(output_path) or ""
 
             # 3. חישוב ציונים
-            must_score = score_requirements_from_text(cv_text, must_txt)
-            nice_score = score_requirements_from_text(cv_text, nice_txt) if nice_txt else None
+            req = requirements_points(cv_text, must_txt, nice_txt)
+            must_score = req["must"]["points"]   # 0–40
+            nice_score = req["nice"]["points"]   # 0–10 (10 אם אין nice)
+
 
             # 4. עדכון cv_scores
             cur.execute(

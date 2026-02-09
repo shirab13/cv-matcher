@@ -105,52 +105,14 @@ def upsert_age_score(
     confidence: str,
     factor: float | None,
 ):
-    cur = con.execute(
-        """
-        SELECT
-          age_score,
-          distance_score,
-          must_requirements_score,
-          years_experience_score,
-          nice_to_have_score
-        FROM cv_scores
-        WHERE job_id = ? AND cv_id = ?
-        """,
-        (job_id, cv_id),
-    )
-    row = cur.fetchone()
-
-    if row:
-        existing_age, existing_dist, existing_must, existing_years, existing_nice = row
-    else:
-        existing_age = existing_dist = existing_must = existing_years = existing_nice = None
-
-    age_val   = age_score if age_score is not None else existing_age
-    dist_val  = existing_dist
-    must_val  = existing_must
-    years_val = existing_years
-    nice_val  = existing_nice
-
-    def zero_or(value):
-        return 0.0 if value is None else float(value)
-
-    age_pts   = zero_or(age_val)
-    dist_pts  = zero_or(dist_val)
-    must_pts  = zero_or(must_val)
-    years_pts = zero_or(years_val)
-    nice_pts  = zero_or(nice_val)
-
-
-    computed_final = age_pts + dist_pts + must_pts + years_pts + nice_pts
-
     con.execute(
         """
         INSERT INTO cv_scores (
             job_id, cv_id,
             age_score, birth_year, age, age_reason,
-            age_confidence, age_factor, final_score
+            age_confidence, age_factor
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(job_id, cv_id) DO UPDATE SET
             age_score       = excluded.age_score,
             birth_year      = excluded.birth_year,
@@ -158,12 +120,13 @@ def upsert_age_score(
             age_reason      = excluded.age_reason,
             age_confidence  = excluded.age_confidence,
             age_factor      = excluded.age_factor,
-            final_score     = excluded.final_score,
             updated_at      = (datetime('now','localtime'))
         """,
-        (job_id, cv_id, age_score, birth_year, age, reason, confidence, factor, computed_final),
+        (job_id, cv_id, age_score, birth_year, age, reason, confidence, factor),
     )
     con.commit()
+
+    recompute_final_score(con, job_id, cv_id)
 
 
 
@@ -176,6 +139,24 @@ def link_cv_to_job(con: sqlite3.Connection, cv_id: int, job_id: int):
         """
         INSERT OR IGNORE INTO job_candidates (job_id, cv_id)
         VALUES (?, ?)
+        """,
+        (job_id, cv_id),
+    )
+    con.commit()
+
+
+def recompute_final_score(con: sqlite3.Connection, job_id: int, cv_id: int):
+    con.execute(
+        """
+        UPDATE cv_scores
+        SET final_score =
+              COALESCE(age_score, 10)
+            + COALESCE(distance_score, 10)
+            + COALESCE(must_requirements_score, 0)
+            + COALESCE(years_experience_score, 0)
+            + COALESCE(nice_to_have_score, 0),
+            updated_at = (datetime('now','localtime'))
+        WHERE job_id = ? AND cv_id = ?
         """,
         (job_id, cv_id),
     )

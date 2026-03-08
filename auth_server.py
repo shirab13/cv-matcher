@@ -16,7 +16,11 @@ from src.utils.db import upsert_candidate
 from src.utils import db as dbutil
 from src.text_extractors.universal import extract_text_any
 from src.run_scoring import infer_birth_year_simple, age_from_birth_year, apply_age_penalty
-
+from src.scoring.experience_score import (
+    extract_required_years_from_job_text,
+    extract_relevant_experience_years,
+    calculate_years_experience_score,
+)
 from flask import (
     Flask,
     request,
@@ -364,12 +368,22 @@ def create_job():
     data = request.get_json() or {}
 
     title = (data.get("title") or "").strip()
+    required_years_experience = data.get("required_years_experience")
     description = (data.get("description") or "").strip()
     must_req = (data.get("must_requirements") or "").strip()
     nice_req = (data.get("nice_to_have_requirements") or "").strip() or None
     location = (data.get("location") or "").strip() or None
     employment_type = (data.get("employment_type") or "").strip() or None
-
+    if required_years_experience in ("", None):
+        required_years_experience = None
+    else:
+        try:
+            required_years_experience = float(required_years_experience)
+        except (TypeError, ValueError):
+            return jsonify({
+                "success": False,
+                "message": "שנות ניסיון נדרשות חייב להיות מספר תקין"
+            }), 400
     # ולידציה בסיסית
     if not title or not description or not must_req:
         return jsonify({
@@ -410,12 +424,20 @@ def create_job():
         INSERT INTO jobs (
             title, description, must_requirements,
             nice_to_have_requirements, location, employment_type,
-            manager_id
+            required_years_experience, manager_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (title, description, must_req, nice_req, location, employment_type, manager_id),
-    )
+        (
+            title,
+            description,
+            must_req,
+            nice_req,
+            location,
+            employment_type,
+            required_years_experience,
+            manager_id,
+        )    )
 
     job_id = cur.lastrowid
     conn.commit()
@@ -827,7 +849,53 @@ def devops_upload_cv():
     except Exception as e:
         print("REQ SCORING ERROR (devops_upload_cv):", e)
         # לא מפיל את הבקשה – פשוט אין ציונים לדרישות
+    # ---------- YEARS EXPERIENCE SCORING ----------
+    try:
+        cur.execute(
+            """
+            SELECT title, description, must_requirements, nice_to_have_requirements, required_years_experience
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
 
+        if job_row:
+            job_text = " ".join([
+                job_row["title"] or "",
+                job_row["description"] or "",
+                job_row["must_requirements"] or "",
+                job_row["nice_to_have_requirements"] or "",
+            ])
+
+            cv_text = extract_text_any(out_path) or ""
+
+            required_years = job_row["required_years_experience"]
+            if required_years is None:
+                required_years = extract_required_years_from_job_text(job_text)            
+            candidate_years = extract_relevant_experience_years(cv_text, job_text)
+            years_score = calculate_years_experience_score(candidate_years, required_years)
+
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET years_experience_score = ?
+                WHERE cv_id = ? AND job_id = ?
+                """,
+                (years_score, cv_id, job_id),
+            )
+            conn.commit()
+            dbutil.recompute_final_score(conn, job_id, cv_id)
+
+            print("YEARS DEBUG:", {
+                "required_years": required_years,
+                "candidate_years": candidate_years,
+                "years_score": years_score,
+            })
+    except Exception as e:
+        print("YEARS SCORING ERROR (devops_upload_cv):", e)
+    
     # קישור למשרה בטבלת job_candidates
     try:
         cur.execute(
@@ -1020,7 +1088,52 @@ def upload_cv():
             dbutil.recompute_final_score(con, int(job_id), int(cv_id))
     except Exception as e:
         print("REQ SCORING ERROR (/api/upload_cv):", e)
+    # ---------- YEARS EXPERIENCE SCORING ----------
+    try:
+        cur.execute(
+            """
+            SELECT title, description, must_requirements, nice_to_have_requirements, required_years_experience
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
 
+        if job_row:
+            job_text = " ".join([
+                job_row["title"] or "",
+                job_row["description"] or "",
+                job_row["must_requirements"] or "",
+                job_row["nice_to_have_requirements"] or "",
+            ])
+
+            cv_text = extract_text_any(output_path) or ""
+
+            required_years = extract_required_years_from_job_text(job_text)
+            if required_years is None:
+                required_years = extract_required_years_from_job_text(job_text)
+            candidate_years = extract_relevant_experience_years(cv_text, job_text)
+            years_score = calculate_years_experience_score(candidate_years, required_years)
+
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET years_experience_score = ?
+                WHERE cv_id = ? AND job_id = ?
+                """,
+                (years_score, cv_id, job_id),
+            )
+            dbutil.recompute_final_score(con, int(job_id), int(cv_id))
+
+            print("YEARS DEBUG:", {
+                "required_years": required_years,
+                "candidate_years": candidate_years,
+                "years_score": years_score,
+            })
+    except Exception as e:
+        print("YEARS SCORING ERROR (/api/upload_cv):", e)
+    
     con.commit()
     con.close()
 
@@ -1266,6 +1379,7 @@ def init_db():
         nice_to_have_requirements TEXT,
         location TEXT,
         employment_type TEXT,
+        required_years_experience REAL,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         is_active INTEGER NOT NULL DEFAULT 1,
         manager_id INTEGER NOT NULL

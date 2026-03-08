@@ -21,6 +21,11 @@ from src.scoring.experience_score import (
     extract_relevant_experience_years,
     calculate_years_experience_score,
 )
+from src.scoring.distance_score import (
+    extract_candidate_city,
+    calculate_distance_km,
+    calculate_distance_score,
+)
 from flask import (
     Flask,
     request,
@@ -374,6 +379,7 @@ def create_job():
     nice_req = (data.get("nice_to_have_requirements") or "").strip() or None
     location = (data.get("location") or "").strip() or None
     employment_type = (data.get("employment_type") or "").strip() or None
+    work_mode = (data.get("work_mode") or "").strip() or None
     if required_years_experience in ("", None):
         required_years_experience = None
     else:
@@ -424,9 +430,9 @@ def create_job():
         INSERT INTO jobs (
             title, description, must_requirements,
             nice_to_have_requirements, location, employment_type,
-            required_years_experience, manager_id
+            work_mode, required_years_experience, manager_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?,?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             title,
@@ -435,6 +441,7 @@ def create_job():
             nice_req,
             location,
             employment_type,
+            work_mode,
             required_years_experience,
             manager_id,
         )    )
@@ -896,6 +903,56 @@ def devops_upload_cv():
     except Exception as e:
         print("YEARS SCORING ERROR (devops_upload_cv):", e)
     
+    # ---------- DISTANCE SCORING ----------
+    try:
+        cur.execute(
+            """
+            SELECT location, work_mode
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
+
+        if job_row:
+            job_city = job_row["location"] or ""
+            work_mode = job_row["work_mode"] or ""
+            cv_text = extract_text_any(out_path) or ""
+
+            candidate_city = extract_candidate_city(cv_text)
+            distance_km = calculate_distance_km(candidate_city, job_city) if candidate_city else None
+            distance_score = calculate_distance_score(distance_km)
+
+            if work_mode == "עבודה מהבית":
+                distance_score = 10.0
+            elif work_mode == "היברידי":
+                if distance_score is None:
+                    distance_score = 10.0
+                else:
+                    distance_score = max(distance_score, 5.0)
+
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET distance_score = ?
+                WHERE cv_id = ? AND job_id = ?
+                """,
+                (distance_score, cv_id, job_id),
+            )
+            conn.commit()
+            dbutil.recompute_final_score(conn, job_id, cv_id)
+
+            print("DISTANCE DEBUG:", {
+                "job_city": job_city,
+                "work_mode": work_mode,
+                "candidate_city": candidate_city,
+                "distance_km": distance_km,
+                "distance_score": distance_score,
+            })
+    except Exception as e:
+        print("DISTANCE SCORING ERROR (devops_upload_cv):", e)
+    
     # קישור למשרה בטבלת job_candidates
     try:
         cur.execute(
@@ -1133,6 +1190,55 @@ def upload_cv():
             })
     except Exception as e:
         print("YEARS SCORING ERROR (/api/upload_cv):", e)
+    
+    # ---------- DISTANCE SCORING ----------
+    try:
+        cur.execute(
+            """
+            SELECT location, work_mode
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+        job_row = cur.fetchone()
+
+        if job_row:
+            job_city = job_row["location"] or ""
+            work_mode = job_row["work_mode"] or ""
+            cv_text = extract_text_any(output_path) or ""
+
+            candidate_city = extract_candidate_city(cv_text)
+            distance_km = calculate_distance_km(candidate_city, job_city) if candidate_city else None
+            distance_score = calculate_distance_score(distance_km)
+
+            if work_mode == "עבודה מהבית":
+                distance_score = 10.0
+            elif work_mode == "היברידי":
+                if distance_score is None:
+                    distance_score = 10.0
+                else:
+                    distance_score = max(distance_score, 5.0)
+
+            cur.execute(
+                """
+                UPDATE cv_scores
+                SET distance_score = ?
+                WHERE cv_id = ? AND job_id = ?
+                """,
+                (distance_score, cv_id, job_id),
+            )
+            dbutil.recompute_final_score(con, int(job_id), int(cv_id))
+
+            print("DISTANCE DEBUG:", {
+                "job_city": job_city,
+                "work_mode": work_mode,
+                "candidate_city": candidate_city,
+                "distance_km": distance_km,
+                "distance_score": distance_score,
+            })
+    except Exception as e:
+        print("DISTANCE SCORING ERROR (/api/upload_cv):", e)
     
     con.commit()
     con.close()
@@ -1379,6 +1485,7 @@ def init_db():
         nice_to_have_requirements TEXT,
         location TEXT,
         employment_type TEXT,
+        work_mode TEXT,
         required_years_experience REAL,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         is_active INTEGER NOT NULL DEFAULT 1,

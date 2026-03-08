@@ -583,17 +583,40 @@
                 <input type="text" class="form-input" id="jobName" required placeholder="לדוגמה: מפתח Full Stack">
               </div>
               <div class="form-group">
-                <label class="form-label">מיקום *</label>
-                <select class="form-select" id="jobLocation" required>
-                  <option value="">בחר מיקום</option>
-                  <option value="תל אביב">תל אביב</option>
-                  <option value="ירושלים">ירושלים</option>
-                  <option value="חיפה">חיפה</option>
-                  <option value="באר שבע">באר שבע</option>
-                  <option value="רמת גן">רמת גן</option>
-                  <option value="פתח תקווה">פתח תקווה</option>
-                  <option value="עבודה מהבית">עבודה מהבית</option>
+                <label class="form-label">עיר המשרה *</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  id="jobLocation"
+                  list="jobLocationsList"
+                  required
+                  placeholder="הקלד/י עיר, לדוגמה: תל אביב"
+                >
+                <datalist id="jobLocationsList">
+                  <option value="תל אביב">
+                  <option value="ירושלים">
+                  <option value="חיפה">
+                  <option value="באר שבע">
+                  <option value="רמת גן">
+                  <option value="פתח תקווה">
+                  <option value="אשדוד">
+                  <option value="אשקלון">
+                  <option value="נתניה">
+                  <option value="רחובות">
+                  <option value="מודיעין">
+                  <option value="רעננה">
+                  <option value="כפר סבא">
+                  <option value="הרצליה">
+                  <option value="רהט">
+                </datalist>
+              </div>
+              <div class="form-group">
+                <label class="form-label">אופן עבודה *</label>
+                <select class="form-select" id="workMode" required>
+                  <option value="">בחר אופן עבודה</option>
+                  <option value="משרד">מהמשרד</option>
                   <option value="היברידי">היברידי</option>
+                  <option value="עבודה מהבית">עבודה מהבית</option>
                 </select>
               </div>
               <div class="form-group">
@@ -1052,17 +1075,18 @@
       event.preventDefault();
 
       const name = document.getElementById('jobName').value.trim();
-      const location = document.getElementById('jobLocation').value;
+      const location = document.getElementById('jobLocation').value.trim();
+      const workMode = document.getElementById('workMode').value;
       const type = document.getElementById('jobType').value;
-      const requiredYearsExperience = document.getElementById('requiredYearsExperience').value.trim();      const description = document.getElementById('jobDescription').value.trim();
+      const requiredYearsExperience = document.getElementById('requiredYearsExperience').value.trim();      
+      const description = document.getElementById('jobDescription').value.trim();
       const requirements = document.getElementById('jobRequirements').value.trim();
       const niceRequirements = document.getElementById('jobNiceRequirements').value.trim(); // ✅ תואם ל-ID ב-HTML
       const salary = document.getElementById('salaryRange').value.trim();
       const closingDate = document.getElementById('closingDate').value;
 
       // ולידציה בסיסית – כמו בצד שרת
-      if (!name || !description || !requirements || !location) {
-        showMessage('חובה למלא שם משרה, מיקום, תיאור ודרישות חובה');
+      if (!name || !description || !requirements || !location || !workMode) {        showMessage('חובה למלא שם משרה, מיקום, תיאור ודרישות חובה');
         return;
       }
 
@@ -1074,10 +1098,11 @@
         nice_to_have_requirements: niceRequirements || null,
         location: location,
         employment_type: type || null,
-        // שדות נוספים – השרת יתעלם אם לא משתמשים בהם כרגע
+        work_mode: workMode || null,
         required_years_experience: requiredYearsExperience
           ? Number(requiredYearsExperience)
-          : null,        salary_range: salary || null,
+          : null,
+        salary_range: salary || null,
         closing_date: closingDate || null,
       };
 

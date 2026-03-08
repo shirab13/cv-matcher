@@ -606,14 +606,15 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">רמת ניסיון</label>
-                <select class="form-select" id="experienceLevel">
-                  <option value="ללא ניסיון">ללא ניסיון</option>
-                  <option value="1-2 שנים">1-2 שנים</option>
-                  <option value="3-5 שנים">3-5 שנים</option>
-                  <option value="5+ שנים">5+ שנים</option>
-                  <option value="בכיר">בכיר</option>
-                </select>
+                <label class="form-label">שנות ניסיון נדרשות</label>
+                  <input
+                    type="number"
+                    class="form-input"
+                    id="requiredYearsExperience"
+                    min="0"
+                    step="1"
+                    placeholder="לדוגמה: 2"
+                  />
               </div>
               <div class="form-group full-width">
                 <label class="form-label">תיאור המשרה *</label>
@@ -1053,8 +1054,7 @@
       const name = document.getElementById('jobName').value.trim();
       const location = document.getElementById('jobLocation').value;
       const type = document.getElementById('jobType').value;
-      const experience = document.getElementById('experienceLevel').value;
-      const description = document.getElementById('jobDescription').value.trim();
+      const requiredYearsExperience = document.getElementById('requiredYearsExperience').value.trim();      const description = document.getElementById('jobDescription').value.trim();
       const requirements = document.getElementById('jobRequirements').value.trim();
       const niceRequirements = document.getElementById('jobNiceRequirements').value.trim(); // ✅ תואם ל-ID ב-HTML
       const salary = document.getElementById('salaryRange').value.trim();
@@ -1075,8 +1075,9 @@
         location: location,
         employment_type: type || null,
         // שדות נוספים – השרת יתעלם אם לא משתמשים בהם כרגע
-        experience_level: experience || null,
-        salary_range: salary || null,
+        required_years_experience: requiredYearsExperience
+          ? Number(requiredYearsExperience)
+          : null,        salary_range: salary || null,
         closing_date: closingDate || null,
       };
 

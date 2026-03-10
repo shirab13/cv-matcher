@@ -344,6 +344,10 @@
       justify-content: center;
       gap: 8px;
     }
+    .action-btn.selected {
+      outline: 3px solid #2d3748;
+      transform: scale(1.03);
+    }
 
     .btn-suitable {
       background: #48bb78;
@@ -581,89 +585,10 @@
   </div>
 
   <script>
-    // דמו של משרות ומועמדים – כרגע בצד לקוח.
-    // בהמשך נוכל להחליף לקריאה ל-API מהבק.
-    const demoJobs = [
-      {
-        id: 1,
-        title: "מפתח Full Stack",
-        location: "תל אביב",
-        openDate: "2024-01-15",
-        totalCandidates: 24,
-        newCandidates: 5
-      },
-      {
-        id: 2,
-        title: "מנהל פרויקטים",
-        location: "חיפה",
-        openDate: "2024-01-10",
-        totalCandidates: 18,
-        newCandidates: 3
-      },
-      {
-        id: 3,
-        title: "מעצב UX/UI",
-        location: "ירושלים",
-        openDate: "2024-01-20",
-        totalCandidates: 31,
-        newCandidates: 8
-      },
-      {
-        id: 4,
-        title: "מהנדס DevOps",
-        location: "רמת גן",
-        openDate: "2024-01-12",
-        totalCandidates: 15,
-        newCandidates: 2
-      }
-    ];
-      let jobsData = [...demoJobs];
-
   
+      let jobsData = [];
 
-    const candidatesData = {
-      1: [
-        {
-          id: 101,
-          name: "דני לוי",
-          age: 28,
-          experience: 5,
-          location: "תל אביב",
-          matchScore: 92,
-          isNew: true,
-          status: "new",
-          skills: "React, Node.js, MongoDB, AWS",
-          education: "תואר ראשון במדעי המחשב - אוניברסיטת תל אביב",
-          summary: "מפתח Full Stack עם 5 שנות ניסיון בפיתוח אפליקציות web מתקדמות. התמחות ב-React ו-Node.js עם ניסיון נרחב ב-AWS."
-        },
-        {
-          id: 102,
-          name: "מיכל כהן",
-          age: 32,
-          experience: 7,
-          location: "רמת גן",
-          matchScore: 88,
-          isNew: false,
-          status: "processed",
-          skills: "Angular, .NET, SQL Server, Azure",
-          education: "תואר ראשון בהנדסת תוכנה - הטכניון",
-          summary: "מפתחת בכירה עם ניסיון רב בפיתוח מערכות enterprise. מתמחה בטכנולוגיות Microsoft ו-Angular."
-        },
-        {
-          id: 103,
-          name: "יוסי אברהם",
-          age: 26,
-          experience: 3,
-          location: "פתח תקווה",
-          matchScore: 75,
-          isNew: true,
-          status: "new",
-          skills: "Vue.js, Python, PostgreSQL, Docker",
-          education: "תואר ראשון במדעי המחשב - אוניברסיטת בר אילן",
-          summary: "מפתח צעיר ומוכשר עם ניסיון בפיתוח אפליקציות web מודרניות. מתמחה ב-Vue.js ו-Python."
-        }
-      ]
-    };
+
 
     async function loadJobsFromApi() {
       try {
@@ -687,12 +612,7 @@
           newCandidates: 0,
           source: 'api'
         }));
-
-        // אם את רוצה שהאמיתיים יהיו למעלה ואז הדמו:
-        jobsData = [...apiJobs, ...demoJobs];
-
-        // אם את רוצה קודם דמו ואז אמיתי – הפוך:
-        // jobsData = [...demoJobs, ...apiJobs];
+        jobsData = apiJobs;
 
         renderJobs();
       } catch (err) {
@@ -703,6 +623,7 @@
 
     let currentJobId = null;
     let currentCandidateId = null;
+    let selectedRecruiterStatus = null;
     let allCandidates = [];
 
         // ממפה מועמד מה-API לפורמט שה-UI של הדשבורד מבין
@@ -802,7 +723,7 @@
 
       // 🧪 אם אין מועמדים אמיתיים – נופלים לדמו כדי שתמיד תראי משהו
       if (!candidates.length) {
-        candidates = candidatesData[jobId] || [];
+        candidates = [];
       }
 
       allCandidates = candidates;
@@ -929,18 +850,18 @@
           </div>
         </div>
 
-        <div class="action-buttons">
-          <button class="action-btn btn-suitable" onclick="updateCandidateStatus('suitable')">
+        <div class="action-buttons" id="statusButtons">
+          <button type="button" class="action-btn btn-suitable" onclick="updateCandidateStatus('מתאים', this)">
             ✅ מתאים
           </button>
-          <button class="action-btn btn-not-suitable" onclick="updateCandidateStatus('not_suitable')">
+          <button type="button" class="action-btn btn-not-suitable" onclick="updateCandidateStatus('לא מתאים', this)">
             ❌ לא מתאים
           </button>
-          <button class="action-btn btn-review" onclick="updateCandidateStatus('review')">
+          <button type="button" class="action-btn btn-review" onclick="updateCandidateStatus('יש לבדוק', this)">
             🕓 יש לבדוק
           </button>
         </div>
-
+        
         <div class="notes-section">
           <label class="notes-label">הערה למנהל הגיוס:</label>
           <textarea class="notes-textarea" id="candidateNotes" placeholder="הזיני הערות או הערכות נוספות..."></textarea>
@@ -950,25 +871,72 @@
       `;
     }
 
-    function updateCandidateStatus(status) {
-      const candidate = allCandidates.find(c => c.id === currentCandidateId);
-      if (candidate) {
-        candidate.status = 'processed';
+    function updateCandidateStatus(status, btn) {
+      selectedRecruiterStatus = status;
+
+      const profile = document.getElementById('candidateProfile');
+      if (profile) {
+        profile.dataset.selectedStatus = status;
       }
+
+      const buttons = document.querySelectorAll('#statusButtons .action-btn');
+      buttons.forEach(b => b.classList.remove('selected'));
+
+      if (btn) {
+        btn.classList.add('selected');
+      }
+
+      showMessage(`נבחר סטטוס: ${status}`);
     }
 
-    function submitCandidateReview() {
-      const notes = document.getElementById('candidateNotes').value;
-      const candidate = allCandidates.find(c => c.id === currentCandidateId);
-      if (candidate) {
-        candidate.status = 'processed';
-        candidate.notes = notes;
+    async function submitCandidateReview() {
+      const notes = document.getElementById('candidateNotes').value.trim();
+ 
+
+      const profile = document.getElementById('candidateProfile');
+      const finalStatus = (profile && profile.dataset.selectedStatus) || selectedRecruiterStatus;
+
+      if (!finalStatus) {
+        alert('בחרי קודם סטטוס: מתאים / לא מתאים / יש לבדוק');
+        return;
       }
 
-      showMessage('הערכת המועמד נשלחה בהצלחה!');
-      setTimeout(() => {
-        showJobDetails(currentJobId);
-      }, 1500);
+      try {
+        const res = await fetch('/api/recruiter/review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            job_id: currentJobId,
+            cv_id: currentCandidateId,
+            status: finalStatus,
+            feedback: notes
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          alert(data.message || 'שגיאה בשמירת ההערכה');
+          return;
+        }
+
+        showMessage('הערכת המועמד נשמרה בהצלחה!');
+        selectedRecruiterStatus = null;
+
+        if (profile) {
+          profile.dataset.selectedStatus = '';
+        }
+
+        setTimeout(() => {
+          showJobDetails(currentJobId);
+        }, 1000);
+
+      } catch (err) {
+        console.error(err);
+        alert('שגיאת תקשורת עם השרת');
+      }
     }
 
     function showDashboard() {

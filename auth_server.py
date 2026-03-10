@@ -55,8 +55,8 @@ DB_PATH = "cv_matcher.db"
 print("DB ABS PATH =", os.path.abspath(DB_PATH))
 
 # איפה נשמור את הקו"ח הגולמי ואת הקובץ האנונימי
-INPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\input"
-OUTPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\output"
+INPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\input"
+OUTPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\output"
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

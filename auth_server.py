@@ -55,8 +55,8 @@ DB_PATH = "cv_matcher.db"
 print("DB ABS PATH =", os.path.abspath(DB_PATH))
 
 # איפה נשמור את הקו"ח הגולמי ואת הקובץ האנונימי
-INPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\input"
-OUTPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\output"
+INPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\input"
+OUTPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\output"
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -456,7 +456,41 @@ def create_job():
         "job_id": job_id
     }), 201
 
+@app.route("/api/recruiter/review", methods=["POST"])
+def recruiter_review():
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
 
+    if session.get("role") != "RECRUITER":
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    data = request.get_json() or {}
+
+    job_id = data.get("job_id")
+    cv_id = data.get("cv_id")
+    status = data.get("status")
+    feedback = data.get("feedback")
+
+    if not job_id or not cv_id or not status:
+        return jsonify({"success": False, "message": "חסרים נתונים"}), 400
+
+    conn = sqlite3.connect("cv_matcher.db")
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    c.execute("""
+        UPDATE job_candidates
+        SET recruiter_status = ?,
+            recruiter_feedback = ?,
+            reviewed_by_user_id = ?,
+            reviewed_at = CURRENT_TIMESTAMP
+        WHERE job_id = ? AND cv_id = ?
+    """, (status, feedback, session["user_id"], job_id, cv_id))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "הסקירה נשמרה בהצלחה"})
 # -----------------רשימת משרות קיימות-----------------
 @app.route("/api/jobs", methods=["GET"])
 def list_jobs():
@@ -1595,7 +1629,6 @@ def login():
             "redirect_url": redirect_map.get(role, "/"),
         }
     )
-
 
 # ----------------- MAIN -----------------
 

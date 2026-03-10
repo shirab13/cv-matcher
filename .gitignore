@@ -16,5 +16,5 @@ output/**
 .vscode/
 .idea/
 
-cv_matcher.db
-*.db
+#cv_matcher.db
+#*.db

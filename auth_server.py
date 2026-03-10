@@ -1469,6 +1469,54 @@ def api_reject_user(user_id):
     return jsonify({"success": True, "message": "בקשת המשתמש נדחתה ונמחקה"})
 
 
+# -----------------API: פידבקים ממגייסים לדשבורד DevOps-----------------
+
+@app.route("/api/admin/feedback", methods=["GET"])
+@devops_required
+def api_admin_feedback():
+    """
+    מחזיר את כל פידבקי המגייסים (recruiter review) לדשבורד ה-DevOps.
+    כולל שם משרה, חברה, מייל המגייס, סטטוס ותוכן הפידבק.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            jc.job_id,
+            jc.cv_id,
+            jc.recruiter_status,
+            jc.recruiter_feedback,
+            jc.reviewed_at,
+            j.title          AS job_title,
+            u_rev.email      AS reviewer_email,
+            u_mgr.company_name AS company
+        FROM job_candidates jc
+        JOIN jobs j           ON jc.job_id = j.id
+        JOIN users u_rev      ON jc.reviewed_by_user_id = u_rev.id
+        LEFT JOIN users u_mgr ON j.manager_id = u_mgr.id
+        WHERE jc.reviewed_by_user_id IS NOT NULL
+        ORDER BY jc.reviewed_at DESC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+
+    feedbacks = [
+        {
+            "job_id":         row["job_id"],
+            "cv_id":          row["cv_id"],
+            "job_title":      row["job_title"] or "",
+            "company":        row["company"] or "",
+            "reviewer_email": row["reviewer_email"] or "",
+            "status":         row["recruiter_status"] or "",
+            "feedback":       row["recruiter_feedback"] or "",
+            "reviewed_at":    row["reviewed_at"] or "",
+        }
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "feedbacks": feedbacks, "total": len(feedbacks)})
+
+
 def get_db():
     conn = dbutil.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -1498,9 +1546,13 @@ def init_db():
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS job_candidates (
-            job_id     INTEGER NOT NULL,
-            cv_id      INTEGER NOT NULL,
-            linked_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            job_id                 INTEGER NOT NULL,
+            cv_id                  INTEGER NOT NULL,
+            linked_at              TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            recruiter_status       TEXT,
+            recruiter_feedback     TEXT,
+            reviewed_by_user_id    INTEGER,
+            reviewed_at            TEXT,
             PRIMARY KEY (job_id, cv_id),
             FOREIGN KEY(job_id) REFERENCES jobs(id),
             FOREIGN KEY(cv_id)  REFERENCES candidates(cv_id)
@@ -1527,6 +1579,20 @@ def init_db():
         )
         """
     )
+
+    # --- migration: add recruiter review columns to job_candidates if missing ---
+    jc_cols = {row[1] for row in cur.execute("PRAGMA table_info(job_candidates)").fetchall()}
+    jc_missing = []
+    if "recruiter_status" not in jc_cols:
+        jc_missing.append(("recruiter_status", "TEXT"))
+    if "recruiter_feedback" not in jc_cols:
+        jc_missing.append(("recruiter_feedback", "TEXT"))
+    if "reviewed_by_user_id" not in jc_cols:
+        jc_missing.append(("reviewed_by_user_id", "INTEGER"))
+    if "reviewed_at" not in jc_cols:
+        jc_missing.append(("reviewed_at", "TEXT"))
+    for col_name, col_type in jc_missing:
+        cur.execute(f"ALTER TABLE job_candidates ADD COLUMN {col_name} {col_type}")
 
         # 4 משתמשי דמו
     demo_users = [

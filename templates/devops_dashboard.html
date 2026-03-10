@@ -601,8 +601,8 @@
       </div>
      </div>
      <div class="stat-card">
-      <div class="stat-number">
-       47
+      <div class="stat-number" id="feedbackCount">
+       ...
       </div>
       <div class="stat-label">
        פידבקים חדשים
@@ -716,38 +716,24 @@
   let userRequests = [...demoUserRequests];
 
 
-    const jobFeedbacks = [
-      {
-        id: 1,
-        jobTitle: "מפתח Full Stack Senior",
-        company: "טכנולוגיות אלפא",
-        hrManager: "דנה שמואל",
-        score: 4.5,
-        feedback: "האלגוריתם מצא מועמדים מעולים! רק צריך לשפר את הסינון לפי ניסיון בטכנולוגיות ספציפיות.",
-        date: "2024-01-25",
-        matchQuality: "גבוהה"
-      },
-      {
-        id: 2,
-        jobTitle: "מעצב UX/UI",
-        company: "סטארט-אפ בטא",
-        hrManager: "יוסי כהן",
-        score: 3.8,
-        feedback: "מועמדים טובים אבל חסרים דוגמאות עבודה רלוונטיות. כדאי להוסיף פילטר לפורטפוליו.",
-        date: "2024-01-24",
-        matchQuality: "בינונית"
-      },
-      {
-        id: 3,
-        jobTitle: "מנהל פרודקט",
-        company: "חברת גמא",
-        hrManager: "מיכל לוי",
-        score: 4.2,
-        feedback: "התאמה טובה מאוד! המועמדים עונים על הקריטריונים. אולי להוסיף בדיקת רקע בניהול צוותים.",
-        date: "2024-01-23",
-        matchQuality: "גבוהה"
+    async function loadJobFeedbacks() {
+      try {
+        const res = await fetch('/api/admin/feedback');
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          console.error('שגיאה בטעינת פידבקים:', data);
+          renderJobFeedbacks([]);
+          return;
+        }
+
+        document.getElementById('feedbackCount').textContent = data.total;
+        renderJobFeedbacks(data.feedbacks);
+      } catch (err) {
+        console.error('שגיאה כללית בטעינת פידבקים:', err);
+        renderJobFeedbacks([]);
       }
-    ];
+    }
 
     const systemLogs = [
       {
@@ -953,36 +939,38 @@
       });
     }
 
-    function renderJobFeedbacks() {
+    function renderJobFeedbacks(feedbacks) {
       const feedbackGrid = document.getElementById('feedbackGrid');
       feedbackGrid.innerHTML = '';
 
-      jobFeedbacks.forEach(feedback => {
+      if (!feedbacks || feedbacks.length === 0) {
+        feedbackGrid.innerHTML = '<p style="color:#4a5568; padding: 20px;">אין פידבקים עדיין.</p>';
+        return;
+      }
+
+      feedbacks.forEach(feedback => {
         const feedbackCard = document.createElement('div');
         feedbackCard.className = 'feedback-card';
-        
-        const stars = '★'.repeat(Math.floor(feedback.score)) + '☆'.repeat(5 - Math.floor(feedback.score));
-        
+
         feedbackCard.innerHTML = `
           <div class="feedback-header">
             <div>
-              <div class="job-title">${feedback.jobTitle}</div>
-              <div style="color: #4a5568; font-size: 14px;">${feedback.company} • ${feedback.hrManager}</div>
+              <div class="job-title">${feedback.job_title}</div>
+              <div style="color: #4a5568; font-size: 14px;">${feedback.company} • ${feedback.reviewer_email}</div>
             </div>
             <div class="feedback-score">
-              <span class="score-value">${feedback.score}</span>
-              <span class="score-stars">${stars}</span>
+              <span class="score-value" style="font-size:14px;">${feedback.status}</span>
             </div>
           </div>
           <div class="feedback-content">
-            <div class="feedback-text">${feedback.feedback}</div>
+            <div class="feedback-text">${feedback.feedback || '—'}</div>
             <div class="feedback-meta">
-              <span>איכות התאמה: <strong>${feedback.matchQuality}</strong></span>
-              <span>${formatDate(feedback.date)}</span>
+              <span>סטטוס מועמד: <strong>${feedback.status}</strong></span>
+              <span>${formatDate(feedback.reviewed_at)}</span>
             </div>
           </div>
         `;
-        
+
         feedbackGrid.appendChild(feedbackCard);
       });
     }
@@ -1250,7 +1238,7 @@
   // Initialize
   document.addEventListener('DOMContentLoaded', function() {
     loadUserRequests();       // דמו + DB
-    renderJobFeedbacks();
+    loadJobFeedbacks();       // real recruiter review data
     renderSystemLogs();
   });
 

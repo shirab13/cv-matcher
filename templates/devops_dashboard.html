@@ -593,8 +593,8 @@
     <p class="page-subtitle">ניהול משתמשים, פידבקים ומעקב אחר פעילות המערכת</p>
     <div class="stats-grid">
      <div class="stat-card">
-      <div class="stat-number">
-       12
+      <div class="stat-number" id="pendingCount">
+       ...
       </div>
       <div class="stat-label">
        בקשות ממתינות
@@ -609,19 +609,19 @@
       </div>
      </div>
      <div class="stat-card">
-      <div class="stat-number">
-       156
+      <div class="stat-number" id="activeUsersCount">
+       ...
       </div>
       <div class="stat-label">
        משתמשים פעילים
       </div>
      </div>
      <div class="stat-card">
-      <div class="stat-number">
-       99.2%
+      <div class="stat-number" id="activeJobsCount">
+       ...
       </div>
       <div class="stat-label">
-       זמינות מערכת
+       משרות פעילות
       </div>
      </div>
     </div>
@@ -676,44 +676,7 @@
     };
     
 
-// משתמשי דמו (תמיד נרצה להציג אותם)
-  const demoUserRequests = [
-  {
-    id: 1,
-    name: "דנה שמואל",
-    company: "טכנולוגיות אלפא",
-    position: "מנהלת גיוס",
-    email: "dana.samuel@alpha-tech.co.il",
-    requestDate: "2024-01-25",
-    status: "pending",
-    isDemo: true
-  },
-  {
-    id: 2,
-    name: "יוסי כהן",
-    company: "סטארט-אפ בטא",
-    position: "HR Manager",
-    email: "yossi.cohen@beta-startup.com",
-    requestDate: "2024-01-24",
-    status: "pending",
-    isDemo: true
-  },
-  {
-    id: 3,
-    name: "מיכל לוי",
-    company: "חברת גמא",
-    position: "רכזת גיוס",
-    email: "michal.levy@gamma-corp.co.il",
-    requestDate: "2024-01-23",
-    status: "pending",
-    isDemo: true
-  }
-];
-
-
-
-  // המערך שממנו הרנדר עובד בפועל (דמו + DB)
-  let userRequests = [...demoUserRequests];
+  let userRequests = [];
 
 
     async function loadJobFeedbacks() {
@@ -735,44 +698,6 @@
       }
     }
 
-    const systemLogs = [
-      {
-        id: 1,
-        message: "משתמש חדש נרשם למערכת: dana.samuel@alpha-tech.co.il",
-        timestamp: "2024-01-25 14:32:15",
-        type: "info"
-      },
-      {
-        id: 2,
-        message: "אישור משתמש: yossi.cohen@beta-startup.com - נשלח מייל עם פרטי גישה",
-        timestamp: "2024-01-25 13:45:22",
-        type: "success"
-      },
-      {
-        id: 3,
-        message: "עדכון אלגוריתם התאמה - גרסה 2.1.4",
-        timestamp: "2024-01-25 12:15:08",
-        type: "info"
-      },
-      {
-        id: 4,
-        message: "דחיית בקשת משתמש: spam@fake-company.com - חברה לא מאומתת",
-        timestamp: "2024-01-25 11:28:33",
-        type: "warning"
-      },
-      {
-        id: 5,
-        message: "שגיאה בשליחת מייל אישור למשתמש ID: 1247",
-        timestamp: "2024-01-25 10:42:17",
-        type: "error"
-      },
-      {
-        id: 6,
-        message: "גיבוי מסד נתונים הושלם בהצלחה",
-        timestamp: "2024-01-25 09:00:00",
-        type: "success"
-      }
-    ];
 
     async function onConfigChange(config) {
       const primaryColor = config.primary_color || defaultConfig.primary_color;
@@ -923,9 +848,6 @@
             </div>
           </div>
           <div class="action-buttons">
-            <button class="action-btn btn-details" onclick="showUserDetails('${request.id}')">
-              ${config.view_details_text || defaultConfig.view_details_text}
-            </button>
             <button class="action-btn btn-approve" onclick="approveUser('${request.id}')">
               ${config.approve_text || defaultConfig.approve_text}
             </button>
@@ -975,14 +897,19 @@
       });
     }
 
-    function renderSystemLogs() {
+    function renderSystemLogs(logs) {
       const logContent = document.getElementById('logContent');
       logContent.innerHTML = '';
 
-      systemLogs.forEach(log => {
+      if (!logs || logs.length === 0) {
+        logContent.innerHTML = '<p style="color:#4a5568; padding: 20px;">אין אירועים בלוג עדיין.</p>';
+        return;
+      }
+
+      logs.forEach(log => {
         const logEntry = document.createElement('div');
         logEntry.className = 'log-entry';
-        
+
         logEntry.innerHTML = `
           <div>
             <span class="log-type ${log.type}">${getLogTypeText(log.type)}</span>
@@ -990,14 +917,26 @@
           </div>
           <span class="log-timestamp">${log.timestamp}</span>
         `;
-        
+
         logContent.appendChild(logEntry);
       });
     }
-    async function loadUserRequests() {
-     // תמיד נתחיל מהדמו
-      userRequests = [...demoUserRequests];
 
+    async function loadSystemLogs() {
+      try {
+        const res = await fetch('/api/admin/logs');
+        const data = await res.json();
+        if (res.ok && data.success) {
+          renderSystemLogs(data.logs);
+        } else {
+          renderSystemLogs([]);
+        }
+      } catch (err) {
+        console.error('שגיאה בטעינת לוג מערכת:', err);
+        renderSystemLogs([]);
+      }
+    }
+    async function loadUserRequests() {
       try {
         const res = await fetch('/api/admin/pending-users');
         const data = await res.json();
@@ -1009,26 +948,20 @@
           return;
         }
 
-        const serverRequests = (data.users || []).map(u => ({
-          id: u.id,                 // מזהה מספרי מה־DB
+        userRequests = (data.users || []).map(u => ({
+          id: u.id,
           name: (u.full_name || u.email.split('@')[0]),
           company: u.company_name || 'לא צוין',
           position: u.role || 'HR Manager',
           email: u.email,
           requestDate: u.created_at || null,
           status: 'pending',
-          isDemo: false             // חשוב!
         }));
-
-
-        // דמו + DB ביחד
-        userRequests = [...demoUserRequests, ...serverRequests];
 
         renderUserRequests();
         updateStats();
       } catch (err) {
         console.error('שגיאה כללית בטעינת בקשות:', err);
-        userRequests = [...demoUserRequests]; // fallback
         renderUserRequests();
         updateStats();
       }
@@ -1128,14 +1061,7 @@
           updateStats();
         }
 
-        // להוסיף ללוג (אופציונלי)
-        systemLogs.unshift({
-          id: systemLogs.length + 1,
-          message: `אישור משתמש: ${user.email}`,
-          timestamp: new Date().toLocaleString('he-IL'),
-          type: "success"
-        });
-        renderSystemLogs();
+        loadSystemLogs();
 
       } catch (err) {
         console.error("approveUser error:", err);
@@ -1185,13 +1111,7 @@
           updateStats();
         }
 
-        systemLogs.unshift({
-          id: systemLogs.length + 1,
-          message: `דחיית בקשת משתמש: ${user.email}`,
-          timestamp: new Date().toLocaleString('he-IL'),
-          type: "warning"
-        });
-        renderSystemLogs();
+        loadSystemLogs();
 
       } catch (err) {
         console.error("rejectUser error:", err);
@@ -1210,8 +1130,20 @@
     }
 
     function updateStats() {
-      const statNumbers = document.querySelectorAll('.stat-number');
-      statNumbers[0].textContent = userRequests.length;
+      document.getElementById('pendingCount').textContent = userRequests.length;
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/admin/stats');
+        const data = await res.json();
+        if (res.ok && data.success) {
+          document.getElementById('activeUsersCount').textContent = data.active_users;
+          document.getElementById('activeJobsCount').textContent = data.active_jobs;
+        }
+      } catch (err) {
+        console.error('שגיאה בטעינת סטטיסטיקות:', err);
+      }
     }
 
     function showLogoutMessage() {
@@ -1237,9 +1169,10 @@
 
   // Initialize
   document.addEventListener('DOMContentLoaded', function() {
-    loadUserRequests();       // דמו + DB
+    loadUserRequests();       // real pending users from DB
     loadJobFeedbacks();       // real recruiter review data
-    renderSystemLogs();
+    loadStats();              // active users + active jobs
+    loadSystemLogs();         // real system log from DB
   });
 
 

@@ -450,6 +450,8 @@ def create_job():
     conn.commit()
     conn.close()
 
+    log_event(f"Job created: {title}", "info", current_user_id)
+
     return jsonify({
         "success": True,
         "message": "המשרה נוצרה בהצלחה",
@@ -490,6 +492,11 @@ def recruiter_review():
     conn.commit()
     conn.close()
 
+    log_event(
+        f"Recruiter feedback submitted for candidate {cv_id}",
+        "info",
+        session["user_id"],
+    )
     return jsonify({"success": True, "message": "הסקירה נשמרה בהצלחה"})
 # -----------------רשימת משרות קיימות-----------------
 @app.route("/api/jobs", methods=["GET"])
@@ -1411,6 +1418,33 @@ def api_hr_create_team_user():
         "company_name": company_name
     }), 201
 
+# -----------------API: סטטיסטיקות כלליות לדשבורד DevOps-----------------
+
+@app.route("/api/admin/stats", methods=["GET"])
+@devops_required
+def api_admin_stats():
+    """מחזיר ספירת משתמשים ממתינים ופעילים לדשבורד ה-DevOps."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users WHERE is_approved = 0")
+    pending = cur.fetchone()[0]
+    cur.execute("""
+        SELECT COUNT(*) FROM users
+        WHERE is_approved = 1
+          AND last_login >= datetime('now', '-30 days')
+    """)
+    active = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM jobs WHERE is_active = 1")
+    active_jobs = cur.fetchone()[0]
+    conn.close()
+    return jsonify({
+        "success": True,
+        "pending_users": pending,
+        "active_users": active,
+        "active_jobs": active_jobs,
+    })
+
+
 # -----------------API: רשימת משתמשים ממתינים לאישור-----------------
 
 @app.route("/api/admin/pending-users", methods=["GET"])
@@ -1445,12 +1479,16 @@ def api_pending_users():
 def api_approve_user(user_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("UPDATE users SET is_approved = 1 WHERE id = ?", (user_id,))
-    if cur.rowcount == 0:
+    cur.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+    user_row = cur.fetchone()
+    if user_row is None:
         conn.close()
         return jsonify({"success": False, "message": "משתמש לא נמצא"}), 404
+    user_email = user_row["email"]
+    cur.execute("UPDATE users SET is_approved = 1 WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()
+    log_event(f"User approved: {user_email}", "success", session.get("user_id"))
     return jsonify({"success": True, "message": "המשתמש אושר בהצלחה"})
 
 
@@ -1459,14 +1497,45 @@ def api_approve_user(user_id):
 def api_reject_user(user_id):
     conn = get_db()
     cur = conn.cursor()
-    # אפשר למחוק לגמרי, או לסמן כ-rejected עם עמודה נוספת – כרגע נמחק:
-    cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    if cur.rowcount == 0:
+    cur.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+    user_row = cur.fetchone()
+    if user_row is None:
         conn.close()
         return jsonify({"success": False, "message": "משתמש לא נמצא"}), 404
+    user_email = user_row["email"]
+    cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()
+    log_event(f"User rejected: {user_email}", "warning", session.get("user_id"))
     return jsonify({"success": True, "message": "בקשת המשתמש נדחתה ונמחקה"})
+
+
+# -----------------API: לוג מערכת לדשבורד DevOps-----------------
+
+@app.route("/api/admin/logs", methods=["GET"])
+@devops_required
+def api_admin_logs():
+    """מחזיר 50 האירועים האחרונים מלוג המערכת."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, event_type, message, user_id, created_at
+        FROM system_logs
+        ORDER BY created_at DESC
+        LIMIT 50
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    logs = [
+        {
+            "id":        row["id"],
+            "type":      row["event_type"],
+            "message":   row["message"],
+            "timestamp": row["created_at"],
+        }
+        for row in rows
+    ]
+    return jsonify({"success": True, "logs": logs})
 
 
 # -----------------API: פידבקים ממגייסים לדשבורד DevOps-----------------
@@ -1522,6 +1591,21 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+def log_event(message: str, event_type: str = "info", user_id: int = None):
+    """רושם אירוע ללוג המערכת. event_type: info | success | warning | error"""
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO system_logs (event_type, message, user_id) VALUES (?, ?, ?)",
+            (event_type, message, user_id),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"log_event error: {e}")
+
+
 def init_db():
     """יוצר טבלת משתמשים ומוסיף 4 משתמשי דמו אם עדיין לא קיימים."""
     conn = get_db()
@@ -1537,6 +1621,7 @@ def init_db():
             company_name TEXT,
             is_approved INTEGER NOT NULL DEFAULT 0,
             manager_id INTEGER,
+            last_login TEXT,
             FOREIGN KEY (manager_id) REFERENCES users(id)
         )
         """
@@ -1593,6 +1678,22 @@ def init_db():
         jc_missing.append(("reviewed_at", "TEXT"))
     for col_name, col_type in jc_missing:
         cur.execute(f"ALTER TABLE job_candidates ADD COLUMN {col_name} {col_type}")
+
+    # --- migration: add last_login to users if missing ---
+    u_cols = {row[1] for row in cur.execute("PRAGMA table_info(users)").fetchall()}
+    if "last_login" not in u_cols:
+        cur.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
+
+    # ---------- טבלת לוג מערכת ----------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            message    TEXT NOT NULL,
+            user_id    INTEGER,
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        )
+    """)
 
         # 4 משתמשי דמו
     demo_users = [
@@ -1662,16 +1763,31 @@ def login():
     conn.close()
 
     if row is None:
+        log_event(f"ניסיון התחברות כושל – אימייל לא קיים: {email}", "warning")
         return jsonify({"success": False, "message": "משתמש לא נמצא"}), 401
 
     if not check_password_hash(row["password_hash"], password):
+        log_event(f"ניסיון התחברות כושל – סיסמה שגויה: {email}", "warning", row["id"])
         return jsonify({"success": False, "message": "סיסמה שגויה"}), 401
-    
+
     if not row["is_approved"]:
+        log_event(f"ניסיון התחברות לחשבון ממתין לאישור: {email}", "warning", row["id"])
         return jsonify({
                 "success": False,
             "message": "החשבון שלך עדיין ממתין לאישור מנהל המערכת"
         }), 403
+
+    # עדכון זמן התחברות אחרון
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET last_login = datetime('now','localtime') WHERE id = ?",
+        (row["id"],)
+    )
+    conn.commit()
+    conn.close()
+
+    if row["role"] != "DEVOPS":
+        log_event(f"התחברות מוצלחת: {email}", "success", row["id"])
 
     # שומרים בסשן
     session["user_id"] = row["id"]

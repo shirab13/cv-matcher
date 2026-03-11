@@ -482,6 +482,439 @@
       }
     }
 
+    .view-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .back-btn {
+      background: #718096;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .back-btn:hover { background: #4a5568; }
+
+    .close-job-btn {
+      background: #f56565;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .close-job-btn:hover { background: #e53e3e; }
+
+    /* Close-job modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: 14px;
+      padding: 32px;
+      width: 420px;
+      max-width: 90vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 20px;
+    }
+
+    .reason-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      font-size: 14px;
+      color: #2d3748;
+    }
+
+    .reason-option:hover { border-color: #667eea; background: #f7f8ff; }
+    .reason-option input[type=radio] { accent-color: #667eea; width: 16px; height: 16px; }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+      justify-content: flex-start;
+    }
+
+    .modal-confirm-btn {
+      background: #f56565;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .modal-confirm-btn:hover { background: #e53e3e; }
+
+    .modal-cancel-btn {
+      background: #e2e8f0;
+      color: #4a5568;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .job-info-panel {
+      background: white;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      margin-bottom: 28px;
+    }
+
+    .job-info-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 16px;
+    }
+
+    .job-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .job-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .job-field {
+      margin-bottom: 16px;
+    }
+
+    .job-field-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .job-field-value {
+      color: #4a5568;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .candidate-section {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .candidate-section-header {
+      padding: 16px 24px;
+      font-weight: 700;
+      font-size: 15px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .section-matching .candidate-section-header  { background: #f0fff4; color: #22543d; }
+    .section-not-matching .candidate-section-header { background: #fff5f5; color: #742a2a; }
+    .section-pending .candidate-section-header    { background: #fffaf0; color: #744210; }
+
+    .candidate-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid #f0f0f0;
+      gap: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .candidate-row:last-child { border-bottom: none; }
+    .candidate-row:hover { background: #f7fafc; }
+
+    .candidate-row-name {
+      font-weight: 600;
+      color: #1a202c;
+      min-width: 100px;
+    }
+
+    .candidate-row-score {
+      font-size: 13px;
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    .candidate-row-note {
+      flex: 1;
+      font-size: 13px;
+      color: #718096;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .candidate-row-action {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .candidate-row-action:hover { background: #5568d3; }
+
+    .stage-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .stage-tag-waiting   { background: #e2e8f0; color: #718096; }
+    .stage-tag-accepted  { background: #c6f6d5; color: #22543d; }
+    .stage-tag-rejected  { background: #fed7d7; color: #742a2a; }
+    .stage-tag-phone     { background: #bee3f8; color: #2a4365; }
+    .stage-tag-interview { background: #e9d8fd; color: #44337a; }
+
+    .profile-final-status {
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-weight: 700;
+      font-size: 15px;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .profile-final-accepted { background: #c6f6d5; color: #22543d; }
+    .profile-final-rejected { background: #fed7d7; color: #742a2a; }
+
+    .empty-section {
+      padding: 16px 24px;
+      color: #a0aec0;
+      font-size: 14px;
+    }
+
+    /* ===== Candidate Profile View ===== */
+    .profile-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .profile-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .profile-panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .score-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .score-row:last-child { border-bottom: none; }
+    .score-label { color: #4a5568; min-width: 110px; }
+    .score-value { font-weight: 700; color: #667eea; min-width: 32px; text-align: left; }
+
+    .score-bar-wrap {
+      flex: 1;
+      background: #e2e8f0;
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      border-radius: 4px;
+      transition: width 0.4s;
+    }
+
+    .recruiter-note-box {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 14px;
+      color: #4a5568;
+      line-height: 1.6;
+    }
+
+    .progress-timeline { padding: 4px 0; }
+
+    .progress-event {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+
+    .progress-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #667eea;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
+    .progress-stage { font-weight: 600; font-size: 14px; color: #2d3748; }
+    .progress-note  { font-size: 13px; color: #718096; margin-top: 2px; }
+    .progress-date  { font-size: 11px; color: #a0aec0; margin-top: 4px; }
+
+    .add-progress-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+
+    .add-progress-btn:hover { background: #5568d3; }
+
+    .progress-form {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .progress-form select,
+    .progress-form textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .progress-form-actions { display: flex; gap: 8px; }
+
+    .submit-progress-btn {
+      background: #48bb78;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .submit-progress-btn:hover { background: #38a169; }
+
+    .cancel-progress-btn {
+      background: #e2e8f0;
+      color: #4a5568;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .cv-embed-panel { position: sticky; top: 20px; }
+
+    .cv-iframe {
+      width: 100%;
+      height: 750px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-matching     { background: #c6f6d5; color: #22543d; }
+    .badge-not-matching { background: #fed7d7; color: #742a2a; }
+    .badge-pending      { background: #feebc8; color: #744210; }
+
+    @media (max-width: 900px) {
+      .profile-layout { grid-template-columns: 1fr; }
+      .cv-embed-panel { position: static; }
+    }
+
     @media (max-width: 768px) {
       .header {
         padding: 15px 20px;
@@ -565,12 +998,43 @@
 
       <!-- Open Jobs Tab -->
       <div id="openJobsTab" class="tab-content active">
-        <div class="jobs-grid" id="jobsGrid">
-          <!-- נוצר ב-JS -->
+
+        <!-- View 1: Jobs grid -->
+        <div id="jobsGridView">
+          <div class="jobs-grid" id="jobsGrid"></div>
         </div>
-        <div id="candidatesList" class="candidates-list" style="display: none;">
-          <!-- נוצר ב-JS -->
+
+        <!-- View 2: Job details -->
+        <div id="jobDetailsView" style="display:none">
+          <div class="view-nav">
+            <button class="back-btn" onclick="goBackToJobs()">← חזרה למשרות</button>
+            <button class="close-job-btn" id="closeJobBtn" onclick="promptCloseJob()">סגור משרה</button>
+          </div>
+          <div id="jobInfoPanel"></div>
+          <div id="candidateSections"></div>
         </div>
+
+        <!-- View 3: Candidate Profile -->
+        <div id="candidateProfileView" style="display:none">
+          <div class="view-nav">
+            <button class="back-btn" onclick="goBackToJobDetails()">← חזרה למשרה</button>
+            <span id="profileHeaderTitle" style="font-weight:600;color:#4a5568;font-size:15px;"></span>
+          </div>
+          <div class="profile-layout">
+            <!-- Left column: info panels -->
+            <div>
+              <div class="profile-panel" id="profileHeader"></div>
+              <div class="profile-panel" id="profileScores"></div>
+              <div class="profile-panel" id="profileRecruiterNote"></div>
+              <div class="profile-panel" id="profileProgress"></div>
+            </div>
+            <!-- Right column: CV embed -->
+            <div class="cv-embed-panel">
+              <div class="profile-panel" id="cvEmbedPanel"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Add Job Tab -->
@@ -672,133 +1136,39 @@
 
       <!-- Job History Tab -->
       <div id="jobHistoryTab" class="tab-content">
-        <div class="history-table">
-          <div class="table-header">
-            <div>שם המשרה</div>
-            <div>תאריך פתיחה</div>
-            <div>מועמדים</div>
-            <div>התקבלו</div>
-            <div>סטטוס</div>
-          </div>
-          <div class="table-row">
-            <div>
-              <div style="font-weight: 600; color: #1a202c;">מפתח Backend Senior</div>
-              <div style="color: #4a5568; font-size: 12px;">תל אביב</div>
-            </div>
-            <div style="color: #4a5568;">15/12/2023</div>
-            <div style="font-weight: 600;">28</div>
-            <div style="color: #48bb78; font-weight: 600;">2</div>
-            <div>
-              <span style="background: #c6f6d5; color: #22543d; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
-                סגורה
-              </span>
-            </div>
-          </div>
-          <div class="table-row">
-            <div>
-              <div style="font-weight: 600; color: #1a202c;">מעצב UX/UI</div>
-              <div style="color: #4a5568; font-size: 12px;">רמת גן</div>
-            </div>
-            <div style="color: #4a5568;">08/01/2024</div>
-            <div style="font-weight: 600;">19</div>
-            <div style="color: #48bb78; font-weight: 600;">1</div>
-            <div>
-              <span style="background: #c6f6d5; color: #22543d; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
-                סגורה
-              </span>
-            </div>
-          </div>
-          <div class="table-row">
-            <div>
-              <div style="font-weight: 600; color: #1a202c;">מנהל פרודקט</div>
-              <div style="color: #4a5568; font-size: 12px;">היברידי</div>
-            </div>
-            <div style="color: #4a5568;">22/01/2024</div>
-            <div style="font-weight: 600;">12</div>
-            <div style="color: #ed8936; font-weight: 600;">0</div>
-            <div>
-              <span style="background: #feebc8; color: #744210; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
-                פעילה
-              </span>
-            </div>
-          </div>
+        <div id="jobHistoryContent">
+          <div style="color:#a0aec0;padding:20px;text-align:center;">טוען היסטוריה...</div>
         </div>
       </div>
             
 
     </main>
+
+    <!-- Close Job Modal -->
+    <div class="modal-overlay" id="closeJobModal" style="display:none" onclick="if(event.target===this)closeJobModal()">
+      <div class="modal-box">
+        <div class="modal-title">סגירת משרה — בחר סיבה</div>
+        <label class="reason-option">
+          <input type="radio" name="closeReason" value="hired"> גויס מועמד מתאים
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="closeReason" value="filled_internally"> אויש מבפנים
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="closeReason" value="canceled"> המשרה בוטלה
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="closeReason" value="manual"> אחר
+        </label>
+        <div class="modal-actions">
+          <button class="modal-confirm-btn" onclick="confirmCloseJob()">סגור משרה</button>
+          <button class="modal-cancel-btn" onclick="closeJobModal()">ביטול</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
-    // נתונים לדמו – בינתיים בצד לקוח, אח"כ נחליף ל-API מהבק
-    // משרות דמו – עם IDs שליליים כדי שלא יתנגשו עם המשרות מה-DB
-  const jobsData = [
-    {
-      id: -1,
-      title: "מפתח Full Stack",
-      location: "תל אביב",
-      openDate: "2024-01-15",
-      approvedCandidates: 5
-    },
-    {
-      id: -2,
-      title: "מנהל פרויקטים",
-      location: "חיפה",
-      openDate: "2024-01-10",
-      approvedCandidates: 3
-    },
-    {
-      id: -3,
-      title: "מעצב UX/UI",
-      location: "ירושלים",
-      openDate: "2024-01-20",
-      approvedCandidates: 7
-    }
-  ];
-
-
-    const candidatesData = {
-      1: [
-        {
-          id: 101,
-          name: "דני לוי",
-          description: "מפתח Full Stack עם 5 שנות ניסיון בפיתוח אפליקציות web מתקדמות",
-          recruiterNote: "מועמד מצוין עם ניסיון רלוונטי ב-React ו-Node.js. המלצה חזקה לראיון.",
-          status: "approved"
-        },
-        {
-          id: 102,
-          name: "מיכל כהן",
-          description: "מפתחת בכירה עם ניסיון רב בטכנולוגיות Microsoft ו-Angular",
-          recruiterNote: "פרופיל חזק מאוד, ניסיון בהובלת צוותים. מתאימה למשרות בכירות.",
-          status: "phone"
-        },
-        {
-          id: 103,
-          name: "יוסי אברהם",
-          description: "מפתח צעיר ומוכשר עם ניסיון בפיתוח אפליקציות מודרניות",
-          recruiterNote: "מועמד מבטיח עם כישורים טכניים טובים. מומלץ לראיון טכני.",
-          status: "interview"
-        }
-      ],
-      2: [
-        {
-          id: 201,
-          name: "שרה רוזן",
-          description: "מנהלת פרויקטים עם 8 שנות ניסיון בחברות הייטק",
-          recruiterNote: "ניסיון מרשים בניהול פרויקטים מורכבים. מתאימה מאוד לתפקיד.",
-          status: "approved"
-        },
-        {
-          id: 202,
-          name: "אבי דוד",
-          description: "מנהל פרויקטים עם רקע טכני חזק ו-PMP",
-          recruiterNote: "שילוב מעולה של כישורי ניהול וידע טכני. המלצה גבוהה.",
-          status: "accepted"
-        }
-      ]
-    };
-
     let currentJobId = null;
 
     function showTab(tabName, event) {
@@ -815,7 +1185,63 @@
         showJobsList();
       } else if (tabName === 'team') {
         fetchTeamUsers();
+      } else if (tabName === 'jobHistory') {
+        renderJobHistory();
       }
+    }
+
+    const CLOSED_REASON_LABELS = {
+      hired:             { label: 'גויס מועמד',    cls: 'badge-matching' },
+      filled_internally: { label: 'אויש מבפנים',   cls: 'badge-matching' },
+      canceled:          { label: 'המשרה בוטלה',   cls: 'badge-not-matching' },
+      manual:            { label: 'אחר',            cls: 'badge-pending' },
+    };
+
+    async function renderJobHistory() {
+      const container = document.getElementById('jobHistoryContent');
+      container.innerHTML = '<div style="color:#a0aec0;padding:20px;text-align:center;">טוען היסטוריה...</div>';
+
+      const res  = await fetch('/api/jobs/closed').catch(() => null);
+      const data = res ? await res.json().catch(() => ({})) : {};
+
+      if (!data.success) {
+        container.innerHTML = '<div style="color:#e53e3e;padding:20px;text-align:center;">שגיאה בטעינת ההיסטוריה</div>';
+        return;
+      }
+
+      const jobs = data.jobs || [];
+
+      if (jobs.length === 0) {
+        container.innerHTML = '<div style="color:#a0aec0;padding:40px;text-align:center;font-size:15px;">אין משרות סגורות עדיין</div>';
+        return;
+      }
+
+      const rows = jobs.map(j => {
+        const reason = CLOSED_REASON_LABELS[j.closed_reason] || { label: j.closed_reason || '—', cls: 'badge-pending' };
+        return `
+          <div class="table-row">
+            <div>
+              <div style="font-weight:600;color:#1a202c;">${j.title}</div>
+              ${j.location ? `<div style="color:#4a5568;font-size:12px;">${j.location}</div>` : ''}
+            </div>
+            <div style="color:#4a5568;">${formatDate(j.created_at)}</div>
+            <div style="color:#4a5568;">${j.closed_at ? formatDate(j.closed_at) : '—'}</div>
+            <div style="font-weight:600;color:#667eea;">${j.matched_count}</div>
+            <div><span class="status-badge ${reason.cls}">${reason.label}</span></div>
+          </div>`;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="history-table">
+          <div class="table-header">
+            <div>שם המשרה</div>
+            <div>נפתחה</div>
+            <div>נסגרה</div>
+            <div>מתאימים</div>
+            <div>סיבת סגירה</div>
+          </div>
+          ${rows}
+        </div>`;
     }
     
     
@@ -933,42 +1359,33 @@
 
     async function renderJobs() {
       const jobsGrid = document.getElementById('jobsGrid');
-      jobsGrid.innerHTML = 'טוען משרות...';
+      jobsGrid.innerHTML = '<div style="color:#4a5568;padding:20px;">טוען משרות...</div>';
 
-      let dynamicJobs = [];
+      let jobs = [];
 
       try {
         const res = await fetch('/api/jobs');
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.jobs)) {
-            dynamicJobs = data.jobs;
+            jobs = data.jobs;
           }
         }
       } catch (err) {
         console.error('שגיאה בטעינת משרות מהשרת:', err);
       }
 
-      // מאחדים בין משרות הדמו למשרות מה-DB
-      const allJobs = [...jobsData, ...dynamicJobs];
-
-      if (allJobs.length === 0) {
-        jobsGrid.innerHTML = 'אין משרות להצגה כרגע';
+      if (jobs.length === 0) {
+        jobsGrid.innerHTML = '<div style="color:#4a5568;padding:20px;">אין משרות פתוחות כרגע</div>';
         return;
       }
 
       jobsGrid.innerHTML = '';
 
-      allJobs.forEach(job => {
+      jobs.forEach(job => {
         const jobCard = document.createElement('div');
         jobCard.className = 'job-card';
         jobCard.onclick = () => showJobCandidates(job.id);
-
-        const openDate =
-          job.openDate ||
-          job.open_date ||
-          job.created_at ||
-          new Date().toISOString().split('T')[0];
 
         jobCard.innerHTML = `
           <div class="job-title">${job.title}</div>
@@ -979,12 +1396,12 @@
             </div>
             <div class="job-detail">
               <span>📅</span>
-          <span>נפתח:    ${formatDate(openDate)}</span>
+              <span>נפתח: ${formatDate(job.created_at)}</span>
             </div>
           </div>
           <div class="candidates-info">
-          <span class="candidates-count">${job.approvedCandidates || 0} מועמדים מאושרים</span>
-           <span class="approved-badge">מאושר</span>
+            <span class="candidates-count">${job.matched_count || 0} מועמדים מתאימים</span>
+            <span class="approved-badge">פתוחה</span>
           </div>
         `;
         jobsGrid.appendChild(jobCard);
@@ -992,82 +1409,345 @@
     }
 
 
-    function showJobCandidates(jobId) {
-      currentJobId = jobId;
-      const candidates = candidatesData[jobId] || [];
-
-      document.getElementById('jobsGrid').style.display = 'none';
-      document.getElementById('candidatesList').style.display = 'block';
-
-      renderCandidates(candidates);
-    }
-
-    function showJobsList() {
-      document.getElementById('jobsGrid').style.display = 'grid';
-      document.getElementById('candidatesList').style.display = 'none';
+    function goBackToJobs() {
+      document.getElementById('jobsGridView').style.display = 'block';
+      document.getElementById('jobDetailsView').style.display = 'none';
       currentJobId = null;
     }
 
-    function renderCandidates(candidates) {
-      const candidatesList = document.getElementById('candidatesList');
-      candidatesList.innerHTML = `
-        <div style="margin-bottom: 20px;">
-          <button onclick="showJobsList()" style="background: #718096; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
-            ← חזרה לרשימת משרות
-          </button>
+    async function showJobCandidates(jobId) {
+      currentJobId = jobId;
+
+      document.getElementById('jobsGridView').style.display = 'none';
+      document.getElementById('jobDetailsView').style.display = 'block';
+      document.getElementById('jobInfoPanel').innerHTML = '<div style="color:#4a5568;padding:20px;">טוען פרטי משרה...</div>';
+      document.getElementById('candidateSections').innerHTML = '';
+
+      // fetch job details and candidates in parallel
+      const [jobRes, candRes] = await Promise.all([
+        fetch(`/api/jobs/${jobId}`),
+        fetch(`/api/jobs/${jobId}/candidates`),
+      ]);
+
+      const jobData  = await jobRes.json().catch(() => ({}));
+      const candData = await candRes.json().catch(() => ({}));
+
+      if (!jobData.success) {
+        document.getElementById('jobInfoPanel').innerHTML = '<div style="color:#e53e3e;padding:20px;">שגיאה בטעינת פרטי המשרה</div>';
+        return;
+      }
+
+      window._loadedCandidates = candData.candidates || [];
+      renderJobInfoPanel(jobData.job);
+      renderCandidateSections(window._loadedCandidates);
+    }
+
+    function renderJobInfoPanel(job) {
+      const panel = document.getElementById('jobInfoPanel');
+
+      const fields = [
+        { label: 'תיאור המשרה',       value: job.description },
+        { label: 'דרישות חובה',        value: job.must_requirements },
+        { label: 'דרישות יתרון',       value: job.nice_to_have_requirements },
+        { label: 'טווח שכר',           value: job.salary_range },
+        { label: 'תאריך סגירה משוער',  value: job.closing_date ? formatDate(job.closing_date) : null },
+      ].filter(f => f.value);
+
+      panel.innerHTML = `
+        <div class="job-info-panel">
+          <div class="job-info-title">${job.title}</div>
+          <div class="job-meta">
+            ${job.location      ? `<span class="job-meta-item">📍 ${job.location}</span>` : ''}
+            ${job.work_mode     ? `<span class="job-meta-item">🏠 ${job.work_mode}</span>` : ''}
+            ${job.employment_type ? `<span class="job-meta-item">💼 ${job.employment_type}</span>` : ''}
+            ${job.required_years_experience != null ? `<span class="job-meta-item">🎓 ${job.required_years_experience} שנות ניסיון</span>` : ''}
+            <span class="job-meta-item">📅 נפתחה: ${formatDate(job.created_at)}</span>
+          </div>
+          ${fields.map(f => `
+            <div class="job-field">
+              <div class="job-field-label">${f.label}</div>
+              <div class="job-field-value">${f.value}</div>
+            </div>
+          `).join('')}
         </div>
       `;
+    }
 
-      candidates.forEach(candidate => {
-        const candidateCard = document.createElement('div');
-        candidateCard.className = 'candidate-card';
+    function renderCandidateSections(candidates) {
+      const matching    = candidates.filter(c => c.recruiter_status === 'מתאים');
+      const notMatching = candidates.filter(c => c.recruiter_status === 'לא מתאים');
+      const pending     = candidates.filter(c => c.recruiter_status !== 'מתאים' && c.recruiter_status !== 'לא מתאים');
 
-        const statusText = getStatusText(candidate.status);
-        const statusClass = `status-${candidate.status}`;
+      const container = document.getElementById('candidateSections');
+      container.innerHTML = '';
 
-        candidateCard.innerHTML = `
-          <div class="candidate-header">
-            <span class="candidate-name">${candidate.name}</span>
-            <span class="candidate-status ${statusClass}">${statusText}</span>
-          </div>
-          <div class="candidate-info">
-            <div class="candidate-description">${candidate.description}</div>
-            <div class="recruiter-note">
-              <div class="note-label">הערת המגייס:</div>
-              <div class="note-text">${candidate.recruiterNote}</div>
-            </div>
-          </div>
-          <div class="action-buttons">
-            <button class="action-btn btn-phone" onclick="updateCandidateStatus(${candidate.id}, 'phone')">שיחת טלפון</button>
-            <button class="action-btn btn-interview" onclick="updateCandidateStatus(${candidate.id}, 'interview')">ראיון</button>
-            <button class="action-btn btn-accept" onclick="updateCandidateStatus(${candidate.id}, 'accepted')">קבלה</button>
-            <button class="action-btn btn-reject" onclick="updateCandidateStatus(${candidate.id}, 'rejected')">דחייה</button>
-          </div>
+      container.appendChild(buildCandidateSection('מועמדים מתאימים',     matching,    'section-matching'));
+      container.appendChild(buildCandidateSection('ממתינים לסיווג',       pending,     'section-pending'));
+      container.appendChild(buildCandidateSection('מועמדים לא מתאימים',  notMatching, 'section-not-matching'));
+    }
+
+    function buildCandidateSection(title, candidates, sectionClass) {
+      const section = document.createElement('div');
+      section.className = `candidate-section ${sectionClass}`;
+
+      section.innerHTML = `<div class="candidate-section-header">${title} (${candidates.length})</div>`;
+
+      if (candidates.length === 0) {
+        section.innerHTML += '<div class="empty-section">אין מועמדים בקטגוריה זו</div>';
+        return section;
+      }
+
+      candidates.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'candidate-row';
+        const score    = c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—';
+        const stageTag = stageBadge(c.latest_stage || '_waiting');
+        row.innerHTML = `
+          <span class="candidate-row-name">מועמד/ת ${c.cv_id}</span>
+          <span class="candidate-row-score">התאמה: ${score}</span>
+          <span>${stageTag}</span>
+          <button class="candidate-row-action" onclick="showCandidateProfile(${currentJobId}, ${c.cv_id})">צפה בפרופיל</button>
         `;
-        candidatesList.appendChild(candidateCard);
+        section.appendChild(row);
       });
+
+      return section;
     }
 
-    function getStatusText(status) {
+    let currentCvId = null;
+
+    async function goBackToJobDetails() {
+      document.getElementById('candidateProfileView').style.display = 'none';
+      currentCvId = null;
+      // re-fetch candidates so stage badges are up to date
+      const res  = await fetch(`/api/jobs/${currentJobId}/candidates`).catch(() => null);
+      const data = res ? await res.json().catch(() => ({})) : {};
+      window._loadedCandidates = data.candidates || [];
+      renderCandidateSections(window._loadedCandidates);
+      document.getElementById('jobDetailsView').style.display = 'block';
+    }
+
+    async function showCandidateProfile(jobId, cvId) {
+      currentCvId = cvId;
+
+      const c = (window._loadedCandidates || []).find(x => x.cv_id === cvId) || { cv_id: cvId };
+
+      document.getElementById('jobDetailsView').style.display = 'none';
+      document.getElementById('candidateProfileView').style.display = 'block';
+      document.getElementById('profileHeaderTitle').textContent = `מועמד/ת ${cvId}`;
+
+      renderProfileHeader(c);
+      renderProfileScores(c);
+      renderProfileRecruiterNote(c);
+      renderCvEmbed(cvId);
+      await loadProgressEvents(jobId, cvId);
+    }
+
+    function renderProfileHeader(c) {
       const statusMap = {
-        'approved': 'מאושר',
-        'phone': 'שיחת טלפון',
-        'interview': 'ראיון',
-        'accepted': 'התקבל',
-        'rejected': 'נדחה'
+        'מתאים':    { cls: 'badge-matching',     label: 'מתאים' },
+        'לא מתאים': { cls: 'badge-not-matching', label: 'לא מתאים' },
       };
-      return statusMap[status] || 'לא ידוע';
+      const badge = statusMap[c.recruiter_status] || { cls: 'badge-pending', label: 'ממתין לסיווג' };
+      const score = c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—';
+      document.getElementById('profileHeader').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:20px;font-weight:700;color:#1a202c;">מועמד/ת ${c.cv_id}</div>
+            ${c.age ? `<div style="font-size:13px;color:#718096;margin-top:4px;">גיל: ${c.age}</div>` : ''}
+            <div id="profileStageBadge" style="margin-top:8px;"></div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:26px;font-weight:800;color:#667eea;">${score}</div>
+            <div style="font-size:11px;color:#a0aec0;">ציון סופי</div>
+            <span class="status-badge ${badge.cls}" style="margin-top:6px;display:inline-block">${badge.label}</span>
+          </div>
+        </div>
+      `;
     }
 
-    function updateCandidateStatus(candidateId, newStatus) {
-      const candidates = candidatesData[currentJobId];
-      const candidate = candidates.find(c => c.id === candidateId);
+    function updateProfileStageBadge(stage) {
+      const el = document.getElementById('profileStageBadge');
+      if (!el) return;
+      el.innerHTML = stageBadge(stage);
+    }
 
-      if (candidate) {
-        candidate.status = newStatus;
-        const statusText = getStatusText(newStatus);
-        showMessage(`סטטוס ${candidate.name} עודכן ל: ${statusText}`);
-        renderCandidates(candidates);
+    function renderProfileScores(c) {
+      const s = c.scores || {};
+      const rows = [
+        { label: 'ניקוד גיל',      val: s.age_score,                 max: 20 },
+        { label: 'ניקוד מרחק',     val: s.distance_score,            max: 20 },
+        { label: 'דרישות חובה',    val: s.must_requirements_score,   max: 40 },
+        { label: 'שנות ניסיון',    val: s.years_experience_score,    max: 20 },
+        { label: 'דרישות יתרון',   val: s.nice_to_have_score,        max: 20 },
+      ];
+      const html = rows.map(r => {
+        const display = r.val != null ? Math.round(r.val) : '—';
+        const pct = r.val != null ? Math.min(100, (r.val / r.max) * 100) : 0;
+        return `
+          <div class="score-row">
+            <span class="score-label">${r.label}</span>
+            <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+            <span class="score-value">${display}</span>
+          </div>`;
+      }).join('');
+      document.getElementById('profileScores').innerHTML = `<div class="profile-panel-title">פירוט ניקוד</div>${html}`;
+    }
+
+    function renderProfileRecruiterNote(c) {
+      const note = c.recruiter_feedback || '';
+      document.getElementById('profileRecruiterNote').innerHTML = `
+        <div class="profile-panel-title">הערת מגייס</div>
+        ${note
+          ? `<div class="recruiter-note-box">${note}</div>`
+          : `<div style="color:#a0aec0;font-size:14px;">אין הערה</div>`}
+      `;
+    }
+
+    function stageBadge(stage) {
+      if (!stage) return '';
+      const map = {
+        _waiting:        { cls: 'stage-tag-waiting',   label: 'ממתין' },
+        accepted:        { cls: 'stage-tag-accepted',  label: 'התקבל/ה' },
+        rejected:        { cls: 'stage-tag-rejected',  label: 'נדחה/תה' },
+        phone_interview: { cls: 'stage-tag-phone',     label: 'ראיון טלפוני' },
+        first_interview: { cls: 'stage-tag-interview', label: 'ראיון ראשון' },
+      };
+      const s = map[stage];
+      return s ? `<span class="stage-tag ${s.cls}">${s.label}</span>` : '';
+    }
+
+    const STAGE_LABELS = {
+      phone_interview: 'ראיון טלפוני',
+      first_interview: 'ראיון ראשון',
+      accepted:        'התקבל/ה',
+      rejected:        'נדחה/תה',
+    };
+
+    async function loadProgressEvents(jobId, cvId) {
+      const panel = document.getElementById('profileProgress');
+      panel.innerHTML = '<div class="profile-panel-title">מעקב התקדמות</div><div style="color:#a0aec0;font-size:14px;">טוען...</div>';
+
+      const res  = await fetch(`/api/jobs/${jobId}/candidates/${cvId}/progress`).catch(() => null);
+      const data = res ? await res.json().catch(() => ({})) : {};
+      renderProgressTimeline(data.events || [], jobId, cvId);
+    }
+
+    function renderProgressTimeline(events, jobId, cvId) {
+      const panel = document.getElementById('profileProgress');
+
+      const latestStage = events.length > 0 ? events[events.length - 1].stage : null;
+      const isFinal = latestStage === 'accepted' || latestStage === 'rejected';
+
+      const timeline = events.length === 0
+        ? '<div style="color:#a0aec0;font-size:14px;margin-bottom:12px;">אין אירועים עדיין</div>'
+        : '<div class="progress-timeline">' + events.map(e =>
+            '<div class="progress-event">' +
+              '<div class="progress-dot"></div>' +
+              '<div class="progress-content">' +
+                '<div class="progress-stage">' + (STAGE_LABELS[e.stage] || e.stage || e.event_type) + '</div>' +
+                (e.note ? '<div class="progress-note">' + e.note + '</div>' : '') +
+                '<div class="progress-date">' + formatDate(e.created_at) + '</div>' +
+              '</div>' +
+            '</div>'
+          ).join('') + '</div>';
+
+      const finalBanner = isFinal
+        ? '<div class="profile-final-status ' + (latestStage === 'accepted' ? 'profile-final-accepted' : 'profile-final-rejected') + '">' +
+            (latestStage === 'accepted' ? '✓ המועמד/ת התקבל/ה — הפרופיל נעול' : '✗ המועמד/ת נדחה/תה — הפרופיל נעול') +
+          '</div>'
+        : '';
+
+      const addForm = isFinal ? '' : `
+        <button class="add-progress-btn" onclick="toggleProgressForm()">+ הוסף שלב</button>
+        <div class="progress-form" id="progressForm">
+          <select id="progressStage">
+            <option value="">בחר שלב...</option>
+            <option value="phone_interview">ראיון טלפוני</option>
+            <option value="first_interview">ראיון ראשון</option>
+            <option value="accepted">התקבל/ה</option>
+            <option value="rejected">נדחה/תה</option>
+          </select>
+          <textarea id="progressNote" rows="3" placeholder="הוסף הערה (אופציונלי)"></textarea>
+          <div class="progress-form-actions">
+            <button class="submit-progress-btn" onclick="submitProgressEvent(${jobId}, ${cvId})">שמור</button>
+            <button class="cancel-progress-btn" onclick="toggleProgressForm()">ביטול</button>
+          </div>
+        </div>`;
+
+      panel.innerHTML = '<div class="profile-panel-title">מעקב התקדמות</div>' + timeline + finalBanner + addForm;
+
+      updateProfileStageBadge(latestStage);
+    }
+
+    function toggleProgressForm() {
+      const form = document.getElementById('progressForm');
+      form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    }
+
+    async function submitProgressEvent(jobId, cvId) {
+      const stage = document.getElementById('progressStage').value;
+      const note  = document.getElementById('progressNote').value.trim();
+      if (!stage) { alert('יש לבחור שלב'); return; }
+
+      const res  = await fetch(`/api/jobs/${jobId}/candidates/${cvId}/progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_type: 'stage_change', stage, note }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        await loadProgressEvents(jobId, cvId);
+      } else {
+        alert(data.message || 'שגיאה בשמירת האירוע');
+      }
+    }
+
+    function renderCvEmbed(cvId) {
+      document.getElementById('cvEmbedPanel').innerHTML = `
+        <div class="profile-panel-title">קורות חיים (אנונימיים)</div>
+        <iframe class="cv-iframe" src="/api/candidates/${cvId}/cv-file" title="קורות חיים"></iframe>
+        <div style="margin-top:12px;text-align:center">
+          <a href="/api/candidates/${cvId}/cv-file?download=1"
+             style="font-size:13px;color:#667eea;text-decoration:none;font-weight:600;">⬇ הורד קובץ</a>
+        </div>
+      `;
+    }
+
+    function promptCloseJob() {
+      // clear previous selection
+      document.querySelectorAll('input[name="closeReason"]').forEach(r => r.checked = false);
+      document.getElementById('closeJobModal').style.display = 'flex';
+    }
+
+    function closeJobModal() {
+      document.getElementById('closeJobModal').style.display = 'none';
+    }
+
+    async function confirmCloseJob() {
+      const selected = document.querySelector('input[name="closeReason"]:checked');
+      if (!selected) { alert('יש לבחור סיבת סגירה'); return; }
+
+      closeJobModal();
+      const closedReason = selected.value;
+
+      try {
+        const res = await fetch(`/api/jobs/${currentJobId}/close`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ closed_reason: closedReason }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success) {
+          showMessage('המשרה נסגרה בהצלחה');
+          goBackToJobs();
+          await renderJobs();
+        } else {
+          showMessage(data.message || 'שגיאה בסגירת המשרה');
+        }
+      } catch (err) {
+        showMessage('שגיאה בתקשורת עם השרת');
       }
     }
 

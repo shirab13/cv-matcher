@@ -6,8 +6,8 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # <<< נתיבי קלט/פלט >>>  ---- עדכני לפי הצורך ----
-INPUT_DIR  = r'C:\Users\shira\OneDrive\Desktop\cv-matcher\input'
-OUTPUT_DIR = r'C:\Users\shira\OneDrive\Desktop\cv-matcher\output'
+INPUT_DIR  = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\input"
+OUTPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\output"
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # ===== תבניות ערכים =====

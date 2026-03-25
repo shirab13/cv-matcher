@@ -16,6 +16,8 @@ from src.utils.db import upsert_candidate
 from src.utils import db as dbutil
 from src.text_extractors.universal import extract_text_any
 from src.run_scoring import infer_birth_year_simple, age_from_birth_year, apply_age_penalty
+from src.scoring.experience_score import extract_estimated_experience_years
+from src.text_extractors.universal import extract_text_any
 from src.scoring.experience_score import (
     extract_required_years_from_job_text,
     extract_relevant_experience_years,
@@ -55,8 +57,8 @@ DB_PATH = "cv_matcher.db"
 print("DB ABS PATH =", os.path.abspath(DB_PATH))
 
 # איפה נשמור את הקו"ח הגולמי ואת הקובץ האנונימי
-INPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\input"
-OUTPUT_DIR = r"C:\Users\shira\OneDrive\Desktop\cv-matcher\output"
+INPUT_DIR  = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\input"
+OUTPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\output"
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -538,22 +540,38 @@ def list_jobs():
     if manager_key is not None:
         cur.execute(
             """
-            SELECT id, title, location, created_at
-            FROM jobs
-            WHERE is_active = 1
-              AND manager_id = ?
-            ORDER BY created_at DESC
+            SELECT
+                j.id,
+                j.title,
+                j.location,
+                j.created_at,
+                j.is_active,
+                COUNT(jc.cv_id) AS candidates_count
+            FROM jobs j
+            LEFT JOIN job_candidates jc ON j.id = jc.job_id
+            WHERE j.is_active = 1
+                AND j.manager_id = ?
+            GROUP BY j.id, j.title, j.location, j.created_at
+            ORDER BY j.created_at DESC
             """,
             (manager_key,),
         )
     else:
         # DEVOPS (או במקרה שאין manager_id מסיבה כלשהי) → הכל
         cur.execute(
-            """
-            SELECT id, title, location, created_at
-            FROM jobs
-            WHERE is_active = 1
-            ORDER BY created_at DESC
+           """
+            SELECT
+                j.id,
+                j.title,
+                j.location,
+                j.created_at,
+                j.is_active,
+                COUNT(jc.cv_id) AS candidates_count
+            FROM jobs j
+            LEFT JOIN job_candidates jc ON j.id = jc.job_id
+            WHERE j.is_active = 1
+            GROUP BY j.id, j.title, j.location, j.created_at
+            ORDER BY j.created_at DESC
             """
         )
 
@@ -566,11 +584,38 @@ def list_jobs():
             "title": row["title"],
             "location": row["location"],
             "created_at": row["created_at"],
+            "is_active": row["is_active"],
+            "totalCandidates": row["candidates_count"],
         }
         for row in rows
     ]
 
     return jsonify({"success": True, "jobs": jobs})
+
+def extract_skills(text: str) -> str | None:
+    if not text:
+        return None
+
+    skills_keywords = [
+        "python", "java", "c++", "c#", "javascript", "typescript",
+        "react", "node", "node.js", "express", "html", "css",
+        "sql", "mysql", "postgresql", "mongodb",
+        "docker", "kubernetes", "aws", "azure", "gcp",
+        "git", "linux", "flask", "django", "fastapi",
+        "tensorflow", "keras", "pandas", "numpy"
+    ]
+
+    text_lower = text.lower()
+    found = []
+
+    for skill in skills_keywords:
+        if skill in text_lower and skill not in found:
+            found.append(skill)
+
+    if not found:
+        return None
+
+    return ", ".join(found)
 # ----------------- רשימת מועמדים לכל משרה -----------------
 
 @app.route("/api/jobs/<int:job_id>/candidates", methods=["GET"])
@@ -647,6 +692,9 @@ def list_job_candidates(job_id):
         SELECT
             jc.cv_id,
             jc.linked_at,
+            c.file_path,
+            c.education,
+            c.professional_summary,
             cs.final_score,
             cs.age,
             cs.age_score,
@@ -655,6 +703,8 @@ def list_job_candidates(job_id):
             cs.years_experience_score,
             cs.nice_to_have_score
         FROM job_candidates AS jc
+        LEFT JOIN candidates AS c
+            ON jc.cv_id = c.cv_id
         LEFT JOIN cv_scores AS cs
             ON jc.cv_id = cs.cv_id AND jc.job_id = cs.job_id
         WHERE jc.job_id = ?
@@ -668,7 +718,15 @@ def list_job_candidates(job_id):
 
     candidates = []
     for row in rows:
-        # אם אין עדיין סקורינג, חלק מהשדות יהיו None – זה בסדר
+        experience = None
+        skills = None
+        try:
+            cv_text = extract_text_any(row["file_path"]) if row["file_path"] else ""
+            experience = extract_estimated_experience_years(cv_text)
+            skills = extract_skills(cv_text)
+        except Exception:
+            experience = None
+            skills = None
         candidates.append(
             {
                 "cv_id": row["cv_id"],
@@ -677,6 +735,10 @@ def list_job_candidates(job_id):
                 "age": row["age"],
                 "matchScore": row["final_score"],
                 "linked_at": row["linked_at"],
+                "education": row["education"],
+                "summary": row["professional_summary"],
+                "experience": experience,
+                "skills": skills,
                 "scores": {
                     "age_score": row["age_score"],
                     "distance_score": row["distance_score"],
@@ -1811,6 +1873,29 @@ def login():
             "redirect_url": redirect_map.get(role, "/"),
         }
     )
+
+
+@app.route("/api/jobs/<int:job_id>/close", methods=["POST"])
+def close_job(job_id):
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE jobs
+        SET is_active = 0
+        WHERE id = ?
+        """,
+        (job_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "המשרה נסגרה"})
 
 # ----------------- MAIN -----------------
 

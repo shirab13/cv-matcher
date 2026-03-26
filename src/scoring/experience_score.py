@@ -182,3 +182,41 @@ def calculate_years_experience_score(candidate_years: float, required_years: flo
 
     ratio = min(candidate_years / required_years, 1.0)
     return round(ratio * MAX_SCORE, 2)
+
+
+def extract_estimated_experience_years(text: str) -> int | None:
+    if not text:
+        return None
+
+    # חיפוש מפורש כמו "5 שנות ניסיון"
+    patterns = [
+        r"(\d+)\s*שנות\s*ניסיון",
+        r"(\d+)\s*שנים\s*ניסיון",
+        r"(\d+)\s*years?\s*of\s*experience",
+        r"experience\s*of\s*(\d+)\s*years?",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+    # חישוב גס לפי טווחי שנים כמו 2019-2022
+    ranges = re.findall(r"(20\d{2})\s*[-–]\s*(20\d{2}|היום|כיום|present)", text)
+    total_years = 0
+
+    for start, end in ranges:
+        start_year = int(start)
+
+        if end in ("היום", "כיום", "present"):
+            end_year = 2026
+        else:
+            end_year = int(end)
+
+        if end_year >= start_year:
+            total_years += (end_year - start_year)
+
+    if total_years > 0:
+        return total_years
+
+    return None

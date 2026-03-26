@@ -1,16 +1,20 @@
 # src/utils/db.py
 import os, sqlite3
 from pathlib import Path
+import re
+from src.text_extractors.universal import extract_text_any
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS candidates (
-  cv_id      INTEGER PRIMARY KEY AUTOINCREMENT,               -- מזהה רץ: 1,2,3...
+  cv_id      INTEGER PRIMARY KEY AUTOINCREMENT,
   file_path  TEXT NOT NULL UNIQUE,
   file_name  TEXT,
-  added_at   TEXT NOT NULL DEFAULT (datetime('now','localtime'))  -- זמן אנושי אוטומטי
+  education  TEXT,
+  professional_summary TEXT,
+  added_at   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 CREATE TABLE IF NOT EXISTS cv_scores (
   cv_id INTEGER NOT NULL,
@@ -66,6 +70,18 @@ def connect(db_path: str) -> sqlite3.Connection:
     for name, typ in missing:
         con.execute(f"ALTER TABLE cv_scores ADD COLUMN {name} {typ}")
 
+    # --- migration: add missing columns to existing candidates ---
+    candidate_cols = {row[1] for row in con.execute("PRAGMA table_info(candidates)").fetchall()}
+
+    candidate_missing = []
+    if "education" not in candidate_cols:
+        candidate_missing.append(("education", "TEXT"))
+    if "professional_summary" not in candidate_cols:
+        candidate_missing.append(("professional_summary", "TEXT"))
+
+    for name, typ in candidate_missing:
+        con.execute(f"ALTER TABLE candidates ADD COLUMN {name} {typ}")
+
     con.commit()
     return con
 
@@ -73,22 +89,38 @@ def connect(db_path: str) -> sqlite3.Connection:
 def upsert_candidate(con: sqlite3.Connection, file_path: str) -> int:
     """
     מאתר מועמד לפי file_path; אם לא קיים - יוצר רשומה חדשה ומחזיר את ה-cv_id הרץ.
+    בנוסף מחלץ השכלה ותקציר מקצועי מתוך הקובץ.
     """
     file_name = Path(file_path).name
+
+    text = extract_text_any(file_path) or ""
+    education = extract_education_from_text(text)
+    professional_summary = extract_professional_summary_from_text(text)
 
     # קיים?
     cur = con.execute("SELECT cv_id FROM candidates WHERE file_path = ?", (file_path,))
     row = cur.fetchone()
     if row:
-        # עדכון שם הקובץ אם השתנה
-        con.execute("UPDATE candidates SET file_name=? WHERE cv_id=?", (file_name, row[0]))
+        con.execute(
+            """
+            UPDATE candidates
+            SET file_name = ?,
+                education = ?,
+                professional_summary = ?
+            WHERE cv_id = ?
+            """,
+            (file_name, education, professional_summary, row[0]),
+        )
         con.commit()
         return int(row[0])
 
     # יצירה
     cur = con.execute(
-        "INSERT INTO candidates (file_path, file_name) VALUES (?, ?)",
-        (file_path, file_name),
+        """
+        INSERT INTO candidates (file_path, file_name, education, professional_summary)
+        VALUES (?, ?, ?, ?)
+        """,
+        (file_path, file_name, education, professional_summary),
     )
     con.commit()
     return int(cur.lastrowid)
@@ -161,3 +193,55 @@ def recompute_final_score(con: sqlite3.Connection, job_id: int, cv_id: int):
         (job_id, cv_id),
     )
     con.commit()
+
+
+def extract_education_from_text(text: str) -> str | None:
+    if not text:
+        return None
+
+    patterns = [
+        r"(השכלה[\s\S]{0,400})",
+        r"(education[\s\S]{0,400})",
+        r"(תואר[\s\S]{0,250})",
+        r"(בוגר[\s\S]{0,250})",
+        r"(אוניברסיטה[\s\S]{0,250})",
+        r"(מכללה[\s\S]{0,250})",
+        r"(הנדסאי[\s\S]{0,250})",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            value = match.group(1).strip()
+            value = re.sub(r"\s+", " ", value)
+            return value[:500]
+
+    return None
+
+
+def extract_professional_summary_from_text(text: str) -> str | None:
+    if not text:
+        return None
+
+    patterns = [
+        r"(תקציר[\s\S]{0,500})",
+        r"(summary[\s\S]{0,500})",
+        r"(profile[\s\S]{0,500})",
+        r"(about me[\s\S]{0,500})",
+        r"(objective[\s\S]{0,500})",
+        r"(experience[\s\S]{0,500})",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            value = match.group(1).strip()
+            value = re.sub(r"\s+", " ", value)
+            return value[:700]
+
+    # fallback: אם אין כותרת ברורה, ניקח את תחילת המסמך
+    cleaned = re.sub(r"\s+", " ", text).strip()
+    if cleaned:
+        return cleaned[:500]
+
+    return None

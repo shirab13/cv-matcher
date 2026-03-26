@@ -456,7 +456,20 @@
         transform: translateY(0);
       }
     }
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 20px;
+      background: #e2e8f0;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.3s;
+    }
 
+    .tab-btn.active {
+      background: #667eea;
+      color: white;
+    }
     @media (max-width: 768px) {
       .header {
         padding: 15px 20px;
@@ -515,9 +528,10 @@
       <!-- Dashboard View -->
       <div id="dashboardView">
         <h1 class="page-title" id="dashboardTitle">דשבורד מגייס</h1>
-        <h2 id="jobsSectionTitle" style="font-size: 24px; font-weight: 600; color: #2d3748; margin-bottom: 20px;">
-          משרות פתוחות
-        </h2>
+        <div style="display:flex; gap:10px; margin-bottom:20px; justify-content:center;">
+          <button id="openTabBtn" class="tab-btn active">משרות פתוחות</button>
+          <button id="closedTabBtn" class="tab-btn">משרות שטופלו</button>
+        </div>
         <div class="jobs-grid" id="jobsGrid">
           <!-- משרות ייכנסו כאן בג'אווהסקריפט -->
         </div>
@@ -526,7 +540,12 @@
       <!-- Job Details View -->
       <div id="jobDetailsView" class="job-details-view">
         <button class="back-btn" id="backToJobs">← חזרה לדשבורד</button>
-        <h1 class="page-title" id="jobDetailsTitle">פרטי משרה</h1>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+          <h1 class="page-title" id="jobDetailsTitle" style="margin-bottom:0;">פרטי משרה</h1>
+          <button class="submit-btn" id="closeJobBtn" style="background:#f56565; display:none;">
+            סגור משרה
+          </button>
+        </div>
 
         <div class="filters">
           <div class="filters-grid">
@@ -587,6 +606,8 @@
   <script>
   
       let jobsData = [];
+      let currentTab = 'open'; // open / closed
+      let allJobsData = [];
 
 
 
@@ -608,13 +629,15 @@
           // אצלך ב־API יש created_at, בדמו יש openDate – נעשה התאמה
           openDate: job.created_at,
           // כרגע אין לך נתוני מועמדים אמיתיים – נשאיר 0
-          totalCandidates: 0,
+          totalCandidates: job.totalCandidates ?? 0,
           newCandidates: 0,
-          source: 'api'
+          source: 'api',
+          is_active: job.is_active,
         }));
+        allJobsData = apiJobs;
         jobsData = apiJobs;
 
-        renderJobs();
+        renderJobsByTab();
       } catch (err) {
         console.error('שגיאת רשת בטעינת משרות מה־API:', err);
       }
@@ -626,7 +649,7 @@
     let selectedRecruiterStatus = null;
     let allCandidates = [];
 
-        // ממפה מועמד מה-API לפורמט שה-UI של הדשבורד מבין
+
     function mapCandidateFromApi(apiCandidate) {
       const scores = apiCandidate.scores || {};
 
@@ -636,20 +659,23 @@
         'must_requirements_score',
         'years_experience_score',
         'nice_to_have_score',
-      ].some(key => scores[key] == null);   // null או undefined
+      ].some(key => scores[key] == null);
 
       return {
         id: apiCandidate.id,
         name: apiCandidate.name || `מועמד/ת ${apiCandidate.cv_id}`,
         age: apiCandidate.age,
-        experience: null,              // אין עדיין נתון אמיתי
+        experience: apiCandidate.experience ?? 'לא ידוע',
         location: 'לא צוין',
         matchScore: apiCandidate.matchScore ?? 0,
         isNew: true,
         status: 'new',
         scores,
-        hasMissingScores,              // ⬅️ דגל חדש לפרונט
+        hasMissingScores,
         linked_at: apiCandidate.linked_at,
+        education: apiCandidate.education || 'לא ידוע',
+        summary: apiCandidate.summary || 'לא ידוע',
+        skills: apiCandidate.skills || 'לא ידוע',
       };
     }
 
@@ -694,6 +720,26 @@
     } 
 
 
+    function renderJobsByTab() {
+      if (currentTab === 'open') {
+        jobsData = allJobsData.filter(j => j.is_active === 1);
+      } else {
+        jobsData = allJobsData.filter(j => j.is_active === 0);
+      }
+      renderJobs();
+    }
+    function setActiveTab() {
+      document.getElementById('openTabBtn').classList.remove('active');
+      document.getElementById('closedTabBtn').classList.remove('active');
+
+      if (currentTab === 'open') {
+        document.getElementById('openTabBtn').classList.add('active');
+      } else {
+        document.getElementById('closedTabBtn').classList.add('active');
+      }
+    }
+
+
         // מציג את פרטי המשרה + טוען מועמדים אמיתיים מה-API, עם fallback לדמו
     async function showJobDetails(jobId) {
       currentJobId = jobId;
@@ -706,6 +752,29 @@
 
       document.getElementById('jobDetailsTitle').textContent =
         `מועמדים למשרת ${job.title}`;
+
+        const closeBtn = document.getElementById('closeJobBtn');
+        closeBtn.style.display = 'inline-block';
+
+        closeBtn.onclick = async () => {
+          if (!confirm('בטוחה שתרצי לסגור את המשרה?')) return;
+
+          try {
+            const res = await fetch(`/api/jobs/${jobId}/close`, { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+              alert('המשרה נסגרה');
+              showDashboard();
+              loadJobsFromApi();
+            } else {
+              alert(data.message || 'שגיאה');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('שגיאת תקשורת עם השרת');
+          }
+        };
 
       let candidates = [];
 
@@ -752,6 +821,7 @@
             <div>ניסיון: ${candidate.experience} שנים</div>
             <div>מיקום: ${candidate.location}</div>
             <div>סטטוס: ${candidate.status === 'new' ? 'חדש' : 'טופל'}</div>
+            <div>התקבל לפני: ${timeAgo(candidate.linked_at)}</div>
           </div>
         `;
 
@@ -812,6 +882,10 @@
     function showCandidateDetails(candidateId) {
       currentCandidateId = candidateId;
       const candidate = allCandidates.find(c => c.id === candidateId);
+      const education = candidate.education || 'לא ידוע';
+      const summary = candidate.summary || 'לא ידוע'; 
+      const skills = candidate.skills || 'לא ידוע';
+      const experience = candidate.experience ?? 'לא ידוע'; 
 
       document.getElementById('jobDetailsView').style.display = 'none';
       document.getElementById('candidateDetailView').style.display = 'block';
@@ -830,23 +904,23 @@
             <div class="section-content">
               <strong>גיל:</strong> ${candidate.age}<br>
               <strong>מיקום:</strong> ${candidate.location}<br>
-              <strong>שנות ניסיון:</strong> ${candidate.experience}
+              <strong>שנות ניסיון:</strong> ${experience}
             </div>
           </div>
 
           <div class="profile-section">
             <div class="section-title">השכלה</div>
-            <div class="section-content">${candidate.education}</div>
+            <div class="section-content">${education}</div>
           </div>
 
           <div class="profile-section">
             <div class="section-title">כישורים טכניים</div>
-            <div class="section-content">${candidate.skills}</div>
+            <div class="section-content">${skills}</div>
           </div>
 
           <div class="profile-section">
             <div class="section-title">תקציר מקצועי</div>
-            <div class="section-content">${candidate.summary}</div>
+            <div class="section-content">${summary}</div>
           </div>
         </div>
 
@@ -943,11 +1017,13 @@
       document.getElementById('dashboardView').style.display = 'block';
       document.getElementById('jobDetailsView').style.display = 'none';
       document.getElementById('candidateDetailView').style.display = 'none';
+      document.getElementById('closeJobBtn').style.display = 'none';
     }
 
     function showJobDetailsView() {
       document.getElementById('jobDetailsView').style.display = 'block';
       document.getElementById('candidateDetailView').style.display = 'none';
+      document.getElementById('closeJobBtn').style.display = 'inline-block';
       renderCandidates(allCandidates);
     }
 
@@ -964,12 +1040,37 @@
       const date = new Date(dateString);
       return date.toLocaleDateString('he-IL');
     }
+    function timeAgo(dateString) {
+      const now = new Date();
+      const past = new Date(dateString);
+
+      const diffMs = now - past;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMinutes / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffDays > 0) return `${diffDays} ימים`;
+      if (diffHours > 0) return `${diffHours} שעות`;
+      return `${diffMinutes} דקות`;
+    }
 
     // חיבור כפתורים
     document.addEventListener('DOMContentLoaded', function () {
-      renderJobs();
+      
        // ואז מוסיפים את המשרות האמיתיות כשיגיעו מהשרת
       loadJobsFromApi();
+
+      document.getElementById('openTabBtn').onclick = () => {
+        currentTab = 'open';
+        setActiveTab();
+        renderJobsByTab();
+      };
+
+      document.getElementById('closedTabBtn').onclick = () => {
+        currentTab = 'closed';
+        setActiveTab();
+        renderJobsByTab();
+      };
 
       document.getElementById('backToJobs').onclick = showDashboard;
       document.getElementById('backToCandidates').onclick = showJobDetailsView;

@@ -35,6 +35,7 @@ from flask import (
     session,
     redirect,
     render_template,
+    send_file,
 )
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -539,6 +540,8 @@ def list_jobs():
     # עכשיו מריצים את השאילתה בהתאם
     if manager_key is not None:
         cur.execute(
+            # עכשיו מריצים את השאילתה בהתאם
+
             """
             SELECT
                 j.id,
@@ -546,19 +549,21 @@ def list_jobs():
                 j.location,
                 j.created_at,
                 j.is_active,
-                COUNT(jc.cv_id) AS candidates_count
+                COUNT(jc.cv_id) AS matched_count
             FROM jobs j
-            LEFT JOIN job_candidates jc ON j.id = jc.job_id
+            LEFT JOIN job_candidates jc
+                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
             WHERE j.is_active = 1
-                AND j.manager_id = ?
-            GROUP BY j.id, j.title, j.location, j.created_at
+            AND j.manager_id = ?
+            GROUP BY j.id, j.title, j.location, j.created_at, j.is_active
             ORDER BY j.created_at DESC
             """,
-            (manager_key,),
+    (manager_key,),
         )
     else:
         # DEVOPS (או במקרה שאין manager_id מסיבה כלשהי) → הכל
         cur.execute(
+
            """
             SELECT
                 j.id,
@@ -566,13 +571,15 @@ def list_jobs():
                 j.location,
                 j.created_at,
                 j.is_active,
-                COUNT(jc.cv_id) AS candidates_count
+                COUNT(jc.cv_id) AS matched_count
             FROM jobs j
-            LEFT JOIN job_candidates jc ON j.id = jc.job_id
+            LEFT JOIN job_candidates jc
+                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
             WHERE j.is_active = 1
-            GROUP BY j.id, j.title, j.location, j.created_at
+            GROUP BY j.id, j.title, j.location, j.created_at, j.is_active
             ORDER BY j.created_at DESC
             """
+            
         )
 
     rows = cur.fetchall()
@@ -585,12 +592,13 @@ def list_jobs():
             "location": row["location"],
             "created_at": row["created_at"],
             "is_active": row["is_active"],
-            "totalCandidates": row["candidates_count"],
+            "matched_count": row["matched_count"],
         }
         for row in rows
     ]
 
     return jsonify({"success": True, "jobs": jobs})
+
 
 def extract_skills(text: str) -> str | None:
     if not text:
@@ -616,6 +624,250 @@ def extract_skills(text: str) -> str | None:
         return None
 
     return ", ".join(found)
+
+# ----------------- פרטי משרה בודדת -----------------
+
+@app.route("/api/jobs/<int:job_id>", methods=["GET"])
+def get_job(job_id):
+    """
+    מחזיר את כל פרטי המשרה לפי job_id.
+    הרשאות זהות ל-/api/jobs: HR_LEAD רואה משרות שלו,
+    HR_MANAGER/RECRUITER רואים משרות של המנהל שלהם, DEVOPS רואה הכל.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    user_id = session["user_id"]
+    role = session.get("role")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    manager_key = None
+
+    if role == "DEVOPS":
+        manager_key = None
+
+    elif role == "HR_LEAD":
+        manager_key = user_id
+
+    elif role in ("HR_MANAGER", "RECRUITER"):
+        cur.execute("SELECT manager_id FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        if row and row["manager_id"]:
+            manager_key = row["manager_id"]
+    else:
+        conn.close()
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    if manager_key is not None:
+        cur.execute(
+            """
+            SELECT id, title, description, must_requirements,
+                   nice_to_have_requirements, location, employment_type,
+                   work_mode, required_years_experience, salary_range,
+                   closing_date, created_at, is_active, closed_at, closed_reason
+            FROM jobs
+            WHERE id = ? AND manager_id = ?
+            """,
+            (job_id, manager_key),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT id, title, description, must_requirements,
+                   nice_to_have_requirements, location, employment_type,
+                   work_mode, required_years_experience, salary_range,
+                   closing_date, created_at, is_active, closed_at, closed_reason
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        )
+
+    row = cur.fetchone()
+    conn.close()
+
+    if row is None:
+        return jsonify({"success": False, "message": "המשרה לא נמצאה או שאין לך הרשאה אליה"}), 404
+
+    job = {
+        "id": row["id"],
+        "title": row["title"],
+        "description": row["description"],
+        "must_requirements": row["must_requirements"],
+        "nice_to_have_requirements": row["nice_to_have_requirements"],
+        "location": row["location"],
+        "employment_type": row["employment_type"],
+        "work_mode": row["work_mode"],
+        "required_years_experience": row["required_years_experience"],
+        "salary_range": row["salary_range"],
+        "closing_date": row["closing_date"],
+        "created_at": row["created_at"],
+        "is_active": row["is_active"],
+        "closed_at": row["closed_at"],
+        "closed_reason": row["closed_reason"],
+    }
+
+    return jsonify({"success": True, "job": job})
+
+# ----------------- סגירת משרה -----------------
+
+@app.route("/api/jobs/<int:job_id>/close", methods=["POST"])
+def close_job(job_id):
+    """
+    סוגר משרה ידנית. מקבל JSON עם שדה closed_reason (אופציונלי).
+    ערכים תקינים: 'manual', 'hired'. ברירת מחדל: 'manual'.
+    הרשאות: HR_LEAD, HR_MANAGER בלבד.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    user_id = session["user_id"]
+    role = session.get("role")
+
+    if role not in ("HR_LEAD", "HR_MANAGER"):
+        return jsonify({"success": False, "message": "אין הרשאה לסגור משרה"}), 403
+
+    data = request.get_json(silent=True) or {}
+    closed_reason = data.get("closed_reason", "manual")
+    if closed_reason not in ("manual", "hired", "filled_internally", "canceled"):
+        return jsonify({"success": False, "message": "closed_reason לא תקין. ערכים מותרים: manual, hired, filled_internally, canceled"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # קביעת manager_key לוידוא בעלות על המשרה
+    if role == "HR_LEAD":
+        manager_key = user_id
+    else:
+        cur.execute("SELECT manager_id FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        manager_key = row["manager_id"] if row and row["manager_id"] else None
+
+    if manager_key is None:
+        conn.close()
+        return jsonify({"success": False, "message": "לא ניתן לאמת בעלות על המשרה"}), 403
+
+    # בדיקה שהמשרה קיימת, פעילה, ושייכת למנהל הרלוונטי
+    cur.execute(
+        "SELECT id FROM jobs WHERE id = ? AND manager_id = ? AND is_active = 1",
+        (job_id, manager_key),
+    )
+    if cur.fetchone() is None:
+        conn.close()
+        return jsonify({"success": False, "message": "המשרה לא נמצאה, כבר סגורה, או שאין לך הרשאה אליה"}), 404
+
+    cur.execute(
+        """
+        UPDATE jobs
+        SET is_active = 0,
+            closed_at = datetime('now', 'localtime'),
+            closed_reason = ?
+        WHERE id = ?
+        """,
+        (closed_reason, job_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "המשרה נסגרה בהצלחה"})
+
+# ----------------- היסטוריית משרות סגורות -----------------
+
+@app.route("/api/jobs/closed", methods=["GET"])
+def list_closed_jobs():
+    """
+    מחזיר את כל המשרות הסגורות של מנהל ה-HR הרלוונטי.
+    משרה נחשבת סגורה אם is_active = 0.
+    הרשאות זהות ל-/api/jobs.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    user_id = session["user_id"]
+    role = session.get("role")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    manager_key = None
+
+    if role == "DEVOPS":
+        manager_key = None
+
+    elif role == "HR_LEAD":
+        manager_key = user_id
+
+    elif role in ("HR_MANAGER", "RECRUITER"):
+        cur.execute("SELECT manager_id FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        if row and row["manager_id"]:
+            manager_key = row["manager_id"]
+    else:
+        conn.close()
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    if manager_key is not None:
+        cur.execute(
+            """
+            SELECT
+                j.id,
+                j.title,
+                j.location,
+                j.created_at,
+                j.closed_at,
+                j.closed_reason,
+                COUNT(jc.cv_id) AS matched_count
+            FROM jobs j
+            LEFT JOIN job_candidates jc
+                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
+            WHERE j.is_active = 0
+              AND j.manager_id = ?
+            GROUP BY j.id
+            ORDER BY j.closed_at DESC
+            """,
+            (manager_key,),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT
+                j.id,
+                j.title,
+                j.location,
+                j.created_at,
+                j.closed_at,
+                j.closed_reason,
+                COUNT(jc.cv_id) AS matched_count
+            FROM jobs j
+            LEFT JOIN job_candidates jc
+                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
+            WHERE j.is_active = 0
+            GROUP BY j.id
+            ORDER BY j.closed_at DESC
+            """
+        )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    jobs = [
+        {
+            "id": row["id"],
+            "title": row["title"],
+            "location": row["location"],
+            "created_at": row["created_at"],
+            "closed_at": row["closed_at"],
+            "closed_reason": row["closed_reason"],
+            "matched_count": row["matched_count"],
+        }
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "jobs": jobs})
+
+
 # ----------------- רשימת מועמדים לכל משרה -----------------
 
 @app.route("/api/jobs/<int:job_id>/candidates", methods=["GET"])
@@ -692,16 +944,24 @@ def list_job_candidates(job_id):
         SELECT
             jc.cv_id,
             jc.linked_at,
+
             c.file_path,
             c.education,
             c.professional_summary,
+            jc.recruiter_status,
+            jc.recruiter_feedback,
             cs.final_score,
             cs.age,
             cs.age_score,
             cs.distance_score,
             cs.must_requirements_score,
             cs.years_experience_score,
-            cs.nice_to_have_score
+            cs.nice_to_have_score,
+            (
+                SELECT stage FROM candidate_progress_events
+                WHERE job_id = jc.job_id AND cv_id = jc.cv_id AND stage IS NOT NULL
+                ORDER BY created_at DESC LIMIT 1
+            ) AS latest_stage
         FROM job_candidates AS jc
         LEFT JOIN candidates AS c
             ON jc.cv_id = c.cv_id
@@ -739,6 +999,10 @@ def list_job_candidates(job_id):
                 "summary": row["professional_summary"],
                 "experience": experience,
                 "skills": skills,
+                "recruiter_status": row["recruiter_status"],
+                "recruiter_feedback": row["recruiter_feedback"],
+                "latest_stage": row["latest_stage"],
+
                 "scores": {
                     "age_score": row["age_score"],
                     "distance_score": row["distance_score"],
@@ -756,6 +1020,169 @@ def list_job_candidates(job_id):
             "candidates": candidates,
         }
     )
+
+# ----------------- הורדת קו"ח אנונימי -----------------
+
+_CV_MIMETYPES = {
+    ".pdf":  "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+@app.route("/api/candidates/<int:cv_id>/cv-file", methods=["GET"])
+def serve_candidate_cv(cv_id):
+    """
+    מחזיר את קובץ הקו"ח האנונימי של המועמד.
+    ?download=1  → כפרצוף הורדה (Content-Disposition: attachment)
+    ברירת מחדל  → תצוגה מוטמעת (Content-Disposition: inline)
+    הרשאות: כל תפקיד מחובר (HR_LEAD, HR_MANAGER, RECRUITER, DEVOPS).
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    if session.get("role") not in ("HR_LEAD", "HR_MANAGER", "RECRUITER", "DEVOPS"):
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT file_path, file_name FROM candidates WHERE cv_id = ?", (cv_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if row is None:
+        return jsonify({"success": False, "message": "מועמד לא נמצא"}), 404
+
+    # אבטחת נתיב: ודא שהקובץ נמצא בתוך OUTPUT_DIR בלבד
+    safe_path = os.path.abspath(row["file_path"])
+    allowed_dir = os.path.abspath(OUTPUT_DIR)
+    if not safe_path.startswith(allowed_dir + os.sep) and safe_path != allowed_dir:
+        return jsonify({"success": False, "message": "נתיב קובץ לא תקין"}), 403
+
+    if not os.path.isfile(safe_path):
+        return jsonify({"success": False, "message": "קובץ הקו\"ח לא נמצא בשרת"}), 404
+
+    file_name = row["file_name"] or f"cv_{cv_id}"
+    ext = Path(safe_path).suffix.lower()
+    mimetype = _CV_MIMETYPES.get(ext, "application/octet-stream")
+    as_attachment = request.args.get("download") == "1"
+
+    return send_file(
+        safe_path,
+        mimetype=mimetype,
+        as_attachment=as_attachment,
+        download_name=file_name,
+    )
+
+# ----------------- אירועי התקדמות מועמד -----------------
+
+VALID_STAGES = {"phone_interview", "first_interview", "accepted", "rejected"}
+
+@app.route("/api/jobs/<int:job_id>/candidates/<int:cv_id>/progress", methods=["POST"])
+def add_progress_event(job_id, cv_id):
+    """
+    מוסיף אירוע התקדמות חדש למועמד במשרה.
+    גוף הבקשה (JSON):
+      event_type  – חובה: 'stage_change' | 'note'
+      stage       – חובה אם event_type='stage_change': ערך מתוך VALID_STAGES
+      note        – אופציונלי: טקסט חופשי
+    הרשאות: HR_LEAD, HR_MANAGER בלבד.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    role = session.get("role")
+    if role not in ("HR_LEAD", "HR_MANAGER"):
+        return jsonify({"success": False, "message": "אין הרשאה להוסיף אירוע התקדמות"}), 403
+
+    data = request.get_json(silent=True) or {}
+    event_type = data.get("event_type")
+    stage = data.get("stage")
+    note = data.get("note", "").strip() if data.get("note") else None
+
+    if event_type not in ("stage_change", "note"):
+        return jsonify({"success": False, "message": "event_type לא תקין. ערכים מותרים: stage_change, note"}), 400
+
+    if event_type == "stage_change":
+        if stage not in VALID_STAGES:
+            return jsonify({"success": False, "message": f"stage לא תקין. ערכים מותרים: {', '.join(sorted(VALID_STAGES))}"}), 400
+
+    if event_type == "note" and not note:
+        return jsonify({"success": False, "message": "note לא יכול להיות ריק"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # ודא שהמועמד אכן מקושר למשרה הזו
+    cur.execute(
+        "SELECT 1 FROM job_candidates WHERE job_id = ? AND cv_id = ?",
+        (job_id, cv_id),
+    )
+    if cur.fetchone() is None:
+        conn.close()
+        return jsonify({"success": False, "message": "המועמד לא מקושר למשרה הזו"}), 404
+
+    cur.execute(
+        """
+        INSERT INTO candidate_progress_events
+            (job_id, cv_id, event_type, stage, note, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (job_id, cv_id, event_type, stage, note, session["user_id"]),
+    )
+    event_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "event_id": event_id}), 201
+
+
+@app.route("/api/jobs/<int:job_id>/candidates/<int:cv_id>/progress", methods=["GET"])
+def get_progress_events(job_id, cv_id):
+    """
+    מחזיר את כל אירועי ההתקדמות של מועמד במשרה, מהישן לחדש.
+    הרשאות: HR_LEAD, HR_MANAGER.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    if session.get("role") not in ("HR_LEAD", "HR_MANAGER"):
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT
+            e.id,
+            e.event_type,
+            e.stage,
+            e.note,
+            e.created_at,
+            u.email AS created_by_email
+        FROM candidate_progress_events e
+        LEFT JOIN users u ON u.id = e.created_by
+        WHERE e.job_id = ? AND e.cv_id = ?
+        ORDER BY e.created_at ASC
+        """,
+        (job_id, cv_id),
+    )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    events = [
+        {
+            "id": row["id"],
+            "event_type": row["event_type"],
+            "stage": row["stage"],
+            "note": row["note"],
+            "created_at": row["created_at"],
+            "created_by_email": row["created_by_email"],
+        }
+        for row in rows
+    ]
+
+    return jsonify({"success": True, "events": events})
 
 # ----------------- דשבורדים לפי תפקיד -----------------
 
@@ -1727,6 +2154,20 @@ def init_db():
         """
     )
 
+    # --- migration: add closing/salary columns to jobs if missing ---
+    jobs_cols = {row[1] for row in cur.execute("PRAGMA table_info(jobs)").fetchall()}
+    jobs_missing = []
+    if "closing_date" not in jobs_cols:
+        jobs_missing.append(("closing_date", "TEXT"))
+    if "salary_range" not in jobs_cols:
+        jobs_missing.append(("salary_range", "TEXT"))
+    if "closed_at" not in jobs_cols:
+        jobs_missing.append(("closed_at", "TEXT"))
+    if "closed_reason" not in jobs_cols:
+        jobs_missing.append(("closed_reason", "TEXT"))
+    for col_name, col_type in jobs_missing:
+        cur.execute(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_type}")
+
     # --- migration: add recruiter review columns to job_candidates if missing ---
     jc_cols = {row[1] for row in cur.execute("PRAGMA table_info(job_candidates)").fetchall()}
     jc_missing = []
@@ -1754,6 +2195,23 @@ def init_db():
             message    TEXT NOT NULL,
             user_id    INTEGER,
             created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
+    # ---------- טבלת היסטוריית התקדמות מועמדים ----------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS candidate_progress_events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id      INTEGER NOT NULL,
+            cv_id       INTEGER NOT NULL,
+            event_type  TEXT NOT NULL,
+            stage       TEXT,
+            note        TEXT,
+            created_by  INTEGER,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY(job_id)     REFERENCES jobs(id),
+            FOREIGN KEY(cv_id)      REFERENCES candidates(cv_id),
+            FOREIGN KEY(created_by) REFERENCES users(id)
         )
     """)
 

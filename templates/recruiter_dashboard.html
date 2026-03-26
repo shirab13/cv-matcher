@@ -666,7 +666,7 @@
         name: apiCandidate.name || `מועמד/ת ${apiCandidate.cv_id}`,
         age: apiCandidate.age,
         experience: apiCandidate.experience ?? 'לא ידוע',
-        location: 'לא צוין',
+        location: apiCandidate.location || 'לא צוין',
         matchScore: apiCandidate.matchScore ?? 0,
         isNew: true,
         status: 'new',
@@ -879,16 +879,36 @@
       renderCandidates(filtered);
     }
 
-    function showCandidateDetails(candidateId) {
+    async function showCandidateDetails(candidateId) {
       currentCandidateId = candidateId;
       const candidate = allCandidates.find(c => c.id === candidateId);
-      const education = candidate.education || 'לא ידוע';
-      const summary = candidate.summary || 'לא ידוע'; 
-      const skills = candidate.skills || 'לא ידוע';
-      const experience = candidate.experience ?? 'לא ידוע'; 
 
       document.getElementById('jobDetailsView').style.display = 'none';
       document.getElementById('candidateDetailView').style.display = 'block';
+
+      // Check if LLM data is missing — trigger re-analysis in background
+      const needsAnalysis = !candidate.education && !candidate.summary;
+      if (needsAnalysis) {
+        fetch(`/api/jobs/${currentJobId}/candidates/${candidateId}/reanalyze`, { method: 'POST' })
+          .then(() => {
+            // After ~10 seconds, reload the candidate data automatically
+            setTimeout(async () => {
+              const res  = await fetch(`/api/jobs/${currentJobId}/candidates`).catch(() => null);
+              const data = res ? await res.json().catch(() => ({})) : {};
+              if (data.candidates) {
+                allCandidates = data.candidates.map(mapCandidateFromApi);
+                const updated = allCandidates.find(c => c.id === candidateId);
+                if (updated) showCandidateDetails(candidateId);
+              }
+            }, 12000);
+          });
+      }
+
+      const analyzing = needsAnalysis ? '<span style="color:#a0aec0;font-size:12px;">⏳ מנתח...</span>' : '';
+      const education = candidate.education  || analyzing || '—';
+      const summary   = candidate.summary    || analyzing || '—';
+      const skills    = candidate.skills     || analyzing || '—';
+      const experience = candidate.experience != null ? candidate.experience : (needsAnalysis ? analyzing : '—');
 
       document.getElementById('candidateProfile').innerHTML = `
         <div class="profile-header">
@@ -902,8 +922,8 @@
           <div class="profile-section">
             <div class="section-title">פרטים אישיים</div>
             <div class="section-content">
-              <strong>גיל:</strong> ${candidate.age}<br>
-              <strong>מיקום:</strong> ${candidate.location}<br>
+              <strong>גיל:</strong> ${candidate.age ?? (needsAnalysis ? analyzing : '—')}<br>
+              <strong>מיקום:</strong> ${candidate.location || (needsAnalysis ? analyzing : 'לא צוין')}<br>
               <strong>שנות ניסיון:</strong> ${experience}
             </div>
           </div>
@@ -920,7 +940,7 @@
 
           <div class="profile-section">
             <div class="section-title">תקציר מקצועי</div>
-            <div class="section-content">${summary}</div>
+            <div class="section-content" style="line-height:1.7;">${summary}</div>
           </div>
         </div>
 

@@ -5,9 +5,10 @@ from pathlib import Path
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-# <<< נתיבי קלט/פלט >>>  ---- עדכני לפי הצורך ----
-INPUT_DIR  = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\input"
-OUTPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\output"
+# נתיבי קלט/פלט יחסיים לתיקיית הפרויקט
+_BASE_DIR  = Path(__file__).resolve().parent
+INPUT_DIR  = str(_BASE_DIR / "input")
+OUTPUT_DIR = str(_BASE_DIR / "output")
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # ===== תבניות ערכים =====

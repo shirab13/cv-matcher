@@ -10,3 +10,7 @@ tqdm
 flask
 flask-cors
 pytest
+openai
+google-generativeai
+python-dotenv
+docx2pdf

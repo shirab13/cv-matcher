@@ -1,7 +1,9 @@
 # auth_server.py
 import os
+import json
 import sqlite3
 import re
+import threading
 from functools import wraps
 from flask import abort
 import traceback
@@ -58,8 +60,9 @@ DB_PATH = "cv_matcher.db"
 print("DB ABS PATH =", os.path.abspath(DB_PATH))
 
 # איפה נשמור את הקו"ח הגולמי ואת הקובץ האנונימי
-INPUT_DIR  = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\input"
-OUTPUT_DIR = r"C:\Users\i_ra0\OneDrive\שולחן העבודה\שנה ג סמסטר ב\final project\cv-matcher\src\output"
+_BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
+INPUT_DIR  = os.path.join(_BASE_DIR, "src", "input")
+OUTPUT_DIR = os.path.join(_BASE_DIR, "src", "output")
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -957,6 +960,9 @@ def list_job_candidates(job_id):
             cs.must_requirements_score,
             cs.years_experience_score,
             cs.nice_to_have_score,
+            cs.llm_score,
+            cs.llm_flag,
+            cs.llm_extracted,
             (
                 SELECT stage FROM candidate_progress_events
                 WHERE job_id = jc.job_id AND cv_id = jc.cv_id AND stage IS NOT NULL
@@ -978,6 +984,15 @@ def list_job_candidates(job_id):
 
     candidates = []
     for row in rows:
+        # Parse LLM-extracted JSON (if available)
+        llm_data = {}
+        if row["llm_extracted"]:
+            try:
+                llm_data = json.loads(row["llm_extracted"])
+            except Exception:
+                pass
+
+        # Regex-based fallbacks (less reliable on anonymized CVs)
         experience = None
         skills = None
         try:
@@ -985,23 +1000,40 @@ def list_job_candidates(job_id):
             experience = extract_estimated_experience_years(cv_text)
             skills = extract_skills(cv_text)
         except Exception:
-            experience = None
-            skills = None
+            pass
+
+        # LLM-extracted values take priority (clean text), DB/regex used only as fallback
+        final_age        = llm_data.get("estimated_age") or row["age"]
+        final_location   = llm_data.get("candidate_city")
+        final_experience = llm_data.get("years_of_experience") or experience
+        # Don't fall back to garbled OCR text from DB for education/summary
+        final_education  = llm_data.get("education")
+        final_summary    = llm_data.get("professional_summary")
+        llm_skills       = llm_data.get("skills")  # list from LLM
+        if llm_skills and isinstance(llm_skills, list) and llm_skills:
+            final_skills = ", ".join(llm_skills)
+        else:
+            final_skills = skills  # regex fallback only
+
         candidates.append(
             {
                 "cv_id": row["cv_id"],
-                "id": row["cv_id"],  # כדי שהפרונט יוכל להשתמש כמו בדמו
-                "name": f"מועמד/ת {row['cv_id']}",  # אפשר להחליף לשם אמיתי אם יש בטבלת candidates
-                "age": row["age"],
+                "id": row["cv_id"],
+                "name": f"מועמד/ת {row['cv_id']}",
+                "age": final_age,
+                "location": final_location,
                 "matchScore": row["final_score"],
                 "linked_at": row["linked_at"],
-                "education": row["education"],
-                "summary": row["professional_summary"],
-                "experience": experience,
-                "skills": skills,
+                "education": final_education,
+                "summary": final_summary,
+                "experience": final_experience,
+                "skills": final_skills,
                 "recruiter_status": row["recruiter_status"],
                 "recruiter_feedback": row["recruiter_feedback"],
                 "latest_stage": row["latest_stage"],
+                "llm_score": row["llm_score"],
+                "llm_flag": row["llm_flag"],
+                "cv_extension": os.path.splitext(row["file_path"])[1].lower() if row["file_path"] else "",
 
                 "scores": {
                     "age_score": row["age_score"],
@@ -1071,6 +1103,55 @@ def serve_candidate_cv(cv_id):
         as_attachment=as_attachment,
         download_name=file_name,
     )
+
+@app.route("/api/candidates/<int:cv_id>/cv-file-pdf", methods=["GET"])
+def serve_candidate_cv_as_pdf(cv_id):
+    """
+    Serves the CV as PDF — converts docx to PDF if needed (cached next to original).
+    Falls back to original file if conversion fails.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+    if session.get("role") not in ("HR_LEAD", "HR_MANAGER", "RECRUITER", "DEVOPS"):
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT file_path, file_name FROM candidates WHERE cv_id = ?", (cv_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if row is None:
+        return jsonify({"success": False, "message": "מועמד לא נמצא"}), 404
+
+    safe_path = os.path.abspath(row["file_path"])
+    allowed_dir = os.path.abspath(OUTPUT_DIR)
+    if not safe_path.startswith(allowed_dir + os.sep) and safe_path != allowed_dir:
+        return jsonify({"success": False, "message": "נתיב קובץ לא תקין"}), 403
+
+    if not os.path.isfile(safe_path):
+        return jsonify({"success": False, "message": "קובץ לא נמצא"}), 404
+
+    ext = Path(safe_path).suffix.lower()
+    if ext == ".pdf":
+        return send_file(safe_path, mimetype="application/pdf", as_attachment=False)
+
+    # docx → convert to PDF (cached alongside original)
+    pdf_path = safe_path[:-len(ext)] + "_converted.pdf"
+    if not os.path.isfile(pdf_path):
+        try:
+            from docx2pdf import convert
+            convert(safe_path, pdf_path)
+        except Exception as e:
+            print(f"[docx2pdf] conversion failed: {e}")
+            # Fallback: serve original docx as download
+            return send_file(safe_path,
+                             mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                             as_attachment=True,
+                             download_name=row["file_name"] or f"cv_{cv_id}.docx")
+
+    return send_file(pdf_path, mimetype="application/pdf", as_attachment=False)
+
 
 # ----------------- אירועי התקדמות מועמד -----------------
 
@@ -1238,6 +1319,106 @@ def devops_dashboard():
     # נשים את השם בדף
     return render_template("devops_dashboard.html", user_email=user_email)
 
+
+# ---------- LLM BACKGROUND SCORING ----------
+
+def _run_llm_scoring(db_path: str, job_id: int, cv_id: int):
+    """
+    Runs in a background thread after CV upload.
+    Calls Groq, calculates llm_score, compares with algo score,
+    sets llm_flag=1 if difference > 20, then updates final_score.
+    """
+    try:
+        from src.llm_client import extract_cv_data, calculate_llm_score
+        con = sqlite3.connect(db_path)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+
+        # Get job requirements and city
+        job = cur.execute(
+            "SELECT must_requirements, nice_to_have_requirements, location FROM jobs WHERE id=?",
+            (job_id,)
+        ).fetchone()
+        if not job:
+            return
+
+        # Get CV file path and current algo score
+        row = cur.execute(
+            "SELECT c.file_path, cs.final_score FROM candidates c "
+            "JOIN cv_scores cs ON cs.cv_id = c.cv_id AND cs.job_id = ? "
+            "WHERE c.cv_id = ?",
+            (job_id, cv_id)
+        ).fetchone()
+        if not row or not row["file_path"]:
+            return
+
+        cv_text = extract_text_any(row["file_path"]) or ""
+        algo_score = row["final_score"] or 0.0
+
+        # Call Groq
+        extracted = extract_cv_data(
+            cv_text,
+            job["must_requirements"] or "",
+            job["nice_to_have_requirements"] or "",
+        )
+        if extracted is None:
+            return
+
+        result = calculate_llm_score(extracted, job_city=job["location"])
+        llm_score = result["llm_final_score"]
+
+        # Flag if difference > 20 (warning only — LLM score is always used as final)
+        llm_flag = 1 if abs(algo_score - llm_score) > 20 else 0
+        new_final = llm_score
+
+        cur.execute(
+            """UPDATE cv_scores
+               SET llm_score = ?, llm_flag = ?, final_score = ?, llm_extracted = ?
+               WHERE job_id = ? AND cv_id = ?""",
+            (llm_score, llm_flag, new_final,
+             json.dumps(extracted, ensure_ascii=False),
+             job_id, cv_id)
+        )
+        con.commit()
+        con.close()
+        print(f"[LLM] job={job_id} cv={cv_id} algo={algo_score} llm={llm_score} flag={llm_flag}")
+    except Exception as e:
+        print(f"[LLM] background scoring error: {e}")
+
+
+def launch_llm_scoring(job_id: int, cv_id: int):
+    t = threading.Thread(target=_run_llm_scoring, args=(DB_PATH, job_id, cv_id), daemon=True)
+    t.start()
+
+
+def _convert_docx_to_pdf(file_path: str):
+    """Converts a docx file to PDF in the background and caches it alongside the original."""
+    try:
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext != ".docx":
+            return
+        pdf_path = file_path[:-len(ext)] + "_converted.pdf"
+        if os.path.isfile(pdf_path):
+            return  # already converted
+        from docx2pdf import convert
+        convert(file_path, pdf_path)
+        print(f"[docx2pdf] converted: {pdf_path}")
+    except Exception as e:
+        print(f"[docx2pdf] background conversion failed: {e}")
+
+
+def launch_docx_conversion(file_path: str):
+    t = threading.Thread(target=_convert_docx_to_pdf, args=(file_path,), daemon=True)
+    t.start()
+
+
+@app.route("/api/jobs/<int:job_id>/candidates/<int:cv_id>/reanalyze", methods=["POST"])
+def reanalyze_candidate(job_id, cv_id):
+    """Re-trigger LLM scoring for an existing candidate (e.g. uploaded before LLM was added)."""
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+    launch_llm_scoring(job_id, cv_id)
+    return jsonify({"success": True, "message": "הניתוח התחיל ברקע"})
 
 
 @app.route("/devops/upload-cv", methods=["GET", "POST"])
@@ -1500,7 +1681,8 @@ def devops_upload_cv():
 
     conn.close()
 
-    # TODO: אפשר להכניס פה גם טריגר להרצת סקורינג בהמשך
+    launch_docx_conversion(out_path)
+    launch_llm_scoring(job_id, cv_id)
     return redirect("/dashboard/devops")
 
 # ----------------- LOGOUT -----------------
@@ -1773,6 +1955,8 @@ def upload_cv():
     con.commit()
     con.close()
 
+    launch_docx_conversion(output_path)
+    launch_llm_scoring(int(job_id), int(cv_id))
     return jsonify({
         "success": True,
         "message": "קו\"ח הועלו, עברו אנונימיזציה ונקשרו למשרה בהצלחה",
@@ -2182,6 +2366,15 @@ def init_db():
     for col_name, col_type in jc_missing:
         cur.execute(f"ALTER TABLE job_candidates ADD COLUMN {col_name} {col_type}")
 
+    # --- migration: add llm columns to cv_scores if missing ---
+    cs_cols = {row[1] for row in cur.execute("PRAGMA table_info(cv_scores)").fetchall()}
+    if "llm_score" not in cs_cols:
+        cur.execute("ALTER TABLE cv_scores ADD COLUMN llm_score REAL")
+    if "llm_flag" not in cs_cols:
+        cur.execute("ALTER TABLE cv_scores ADD COLUMN llm_flag INTEGER DEFAULT 0")
+    if "llm_extracted" not in cs_cols:
+        cur.execute("ALTER TABLE cv_scores ADD COLUMN llm_extracted TEXT")
+
     # --- migration: add last_login to users if missing ---
     u_cols = {row[1] for row in cur.execute("PRAGMA table_info(users)").fetchall()}
     if "last_login" not in u_cols:
@@ -2332,28 +2525,6 @@ def login():
         }
     )
 
-
-@app.route("/api/jobs/<int:job_id>/close", methods=["POST"])
-def close_job(job_id):
-    if "user_id" not in session:
-        return jsonify({"success": False, "message": "לא מחובר"}), 401
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE jobs
-        SET is_active = 0
-        WHERE id = ?
-        """,
-        (job_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"success": True, "message": "המשרה נסגרה"})
 
 # ----------------- MAIN -----------------
 

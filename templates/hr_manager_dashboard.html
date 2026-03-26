@@ -910,6 +910,18 @@
     .badge-not-matching { background: #fed7d7; color: #742a2a; }
     .badge-pending      { background: #feebc8; color: #744210; }
 
+    .llm-flag-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #fffbeb;
+      color: #744210;
+      border: 1px solid #f6ad55;
+      cursor: default;
+    }
+
     @media (max-width: 900px) {
       .profile-layout { grid-template-columns: 1fr; }
       .cv-embed-panel { position: static; }
@@ -1502,10 +1514,12 @@
         row.className = 'candidate-row';
         const score    = c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—';
         const stageTag = stageBadge(c.latest_stage || '_waiting');
+        const llmWarn  = c.llm_flag ? `<span class="llm-flag-badge" title="ציון האלגוריתם והמודל שונים משמעותית – מומלץ לבדוק">⚠️ בדוק ציון</span>` : '';
         row.innerHTML = `
           <span class="candidate-row-name">מועמד/ת ${c.cv_id}</span>
           <span class="candidate-row-score">התאמה: ${score}</span>
           <span>${stageTag}</span>
+          ${llmWarn}
           <button class="candidate-row-action" onclick="showCandidateProfile(${currentJobId}, ${c.cv_id})">צפה בפרופיל</button>
         `;
         section.appendChild(row);
@@ -1539,7 +1553,7 @@
       renderProfileHeader(c);
       renderProfileScores(c);
       renderProfileRecruiterNote(c);
-      renderCvEmbed(cvId);
+      renderCvEmbed(cvId, c.cv_extension);
       await loadProgressEvents(jobId, cvId);
     }
 
@@ -1549,7 +1563,17 @@
         'לא מתאים': { cls: 'badge-not-matching', label: 'לא מתאים' },
       };
       const badge = statusMap[c.recruiter_status] || { cls: 'badge-pending', label: 'ממתין לסיווג' };
-      const score = c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—';
+      const llmScore  = c.llm_score != null ? Math.round(c.llm_score) : null;
+      const algoScore = c.scores
+        ? Math.round((c.scores.age_score||0)+(c.scores.distance_score||0)+(c.scores.must_requirements_score||0)+(c.scores.years_experience_score||0)+(c.scores.nice_to_have_score||0))
+        : null;
+      // Display the LLM score as the main score when available
+      const score = llmScore != null ? `${llmScore}%` : (c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—');
+      const llmBlock = c.llm_flag && llmScore != null && algoScore != null ? `
+        <div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border:1px solid #f6ad55;border-radius:8px;font-size:13px;color:#744210;">
+          ⚠️ <strong>שים לב:</strong> ציון המודל (${llmScore}%) וציון האלגוריתם (${algoScore}%) שונים משמעותית.
+          מומלץ לבחון את הפרופיל בעצמך.
+        </div>` : '';
       document.getElementById('profileHeader').innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
           <div>
@@ -1563,6 +1587,7 @@
             <span class="status-badge ${badge.cls}" style="margin-top:6px;display:inline-block">${badge.label}</span>
           </div>
         </div>
+        ${llmBlock}
       `;
     }
 
@@ -1703,15 +1728,17 @@
       }
     }
 
-    function renderCvEmbed(cvId) {
+    function renderCvEmbed(cvId, ext) {
+      // Always use the pdf endpoint — it serves PDF directly or converts docx on the fly
+      const pdfUrl      = `/api/candidates/${cvId}/cv-file-pdf`;
+      const downloadUrl = `/api/candidates/${cvId}/cv-file?download=1`;
+
       document.getElementById('cvEmbedPanel').innerHTML = `
         <div class="profile-panel-title">קורות חיים (אנונימיים)</div>
-        <iframe class="cv-iframe" src="/api/candidates/${cvId}/cv-file" title="קורות חיים"></iframe>
+        <iframe class="cv-iframe" src="${pdfUrl}" title="קורות חיים"></iframe>
         <div style="margin-top:12px;text-align:center">
-          <a href="/api/candidates/${cvId}/cv-file?download=1"
-             style="font-size:13px;color:#667eea;text-decoration:none;font-weight:600;">⬇ הורד קובץ</a>
-        </div>
-      `;
+          <a href="${downloadUrl}" style="font-size:13px;color:#667eea;text-decoration:none;font-weight:600;">⬇ הורד קובץ מקורי</a>
+        </div>`;
     }
 
     function promptCloseJob() {

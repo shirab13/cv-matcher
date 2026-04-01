@@ -46,7 +46,7 @@ SYSTEM_PROMPT = """אתה מנתח קורות חיים מקצועי. קרא את
 - החזר JSON בלבד, ללא שום טקסט נוסף"""
 
 
-def extract_cv_data(cv_text: str, must_requirements: str, nice_requirements: str = "") -> dict:
+def extract_cv_data(cv_text: str, must_requirements: str, nice_requirements: str = "", few_shot_context: str = "") -> dict:
     """
     Send anonymized CV + job requirements to Groq.
     Returns structured extraction dict, or None on failure.
@@ -59,6 +59,9 @@ def extract_cv_data(cv_text: str, must_requirements: str, nice_requirements: str
 
 דרישות יתרון:
 {nice_requirements or 'לא צוינו'}"""
+
+    if few_shot_context:
+        user_message += f"\n\nתיקוני מגייסים מהעבר (לכיול הציון):\n{few_shot_context}"
 
     try:
         payload = json.dumps({

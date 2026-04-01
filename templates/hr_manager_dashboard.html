@@ -1626,6 +1626,7 @@
         ${note
           ? `<div class="recruiter-note-box">${note}</div>`
           : `<div style="color:#a0aec0;font-size:14px;">אין הערה</div>`}
+        ${c.human_score != null ? `<div style="margin-top:8px;font-size:13px;color:#667eea;font-weight:600;">ציון לפי מגייס: ${Math.round(c.human_score)}%</div>` : ''}
       `;
     }
 

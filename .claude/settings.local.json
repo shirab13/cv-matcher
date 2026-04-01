@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \":*)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''auth_server.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''auth_server.py syntax OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/llm_client.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''llm_client.py syntax OK''\\)\")"
+    ]
+  }
+}

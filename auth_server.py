@@ -478,6 +478,7 @@ def recruiter_review():
     cv_id = data.get("cv_id")
     status = data.get("status")
     feedback = data.get("feedback")
+    human_score = data.get("human_score")
 
     if not job_id or not cv_id or not status:
         return jsonify({"success": False, "message": "חסרים נתונים"}), 400
@@ -491,9 +492,10 @@ def recruiter_review():
         SET recruiter_status = ?,
             recruiter_feedback = ?,
             reviewed_by_user_id = ?,
-            reviewed_at = CURRENT_TIMESTAMP
+            reviewed_at = CURRENT_TIMESTAMP,
+            human_score = COALESCE(?, human_score)
         WHERE job_id = ? AND cv_id = ?
-    """, (status, feedback, session["user_id"], job_id, cv_id))
+    """, (status, feedback, session["user_id"], human_score, job_id, cv_id))
 
     conn.commit()
     conn.close()
@@ -963,6 +965,7 @@ def list_job_candidates(job_id):
             cs.llm_score,
             cs.llm_flag,
             cs.llm_extracted,
+            jc.human_score,
             (
                 SELECT stage FROM candidate_progress_events
                 WHERE job_id = jc.job_id AND cv_id = jc.cv_id AND stage IS NOT NULL
@@ -1030,6 +1033,7 @@ def list_job_candidates(job_id):
                 "skills": final_skills,
                 "recruiter_status": row["recruiter_status"],
                 "recruiter_feedback": row["recruiter_feedback"],
+                "human_score": row["human_score"],
                 "latest_stage": row["latest_stage"],
                 "llm_score": row["llm_score"],
                 "llm_flag": row["llm_flag"],
@@ -1355,11 +1359,33 @@ def _run_llm_scoring(db_path: str, job_id: int, cv_id: int):
         cv_text = extract_text_any(row["file_path"]) or ""
         algo_score = row["final_score"] or 0.0
 
+        # Fetch last 5 human-scored feedbacks for few-shot calibration
+        examples = cur.execute("""
+            SELECT jc.human_score, jc.recruiter_feedback,
+                   cs.llm_score, cs.must_requirements_score, cs.years_experience_score
+            FROM job_candidates jc
+            JOIN cv_scores cs ON cs.job_id = jc.job_id AND cs.cv_id = jc.cv_id
+            WHERE jc.human_score IS NOT NULL AND NOT (jc.job_id = ? AND jc.cv_id = ?)
+            ORDER BY jc.reviewed_at DESC LIMIT 5
+        """, (job_id, cv_id)).fetchall()
+
+        if examples:
+            lines = []
+            for ex in examples:
+                line = f"- מודל נתן {round(ex['llm_score'] or 0)}%, מגייס תיקן ל-{round(ex['human_score'])}%"
+                if ex['recruiter_feedback']:
+                    line += f" (סיבה: {ex['recruiter_feedback'][:60]})"
+                lines.append(line)
+            few_shot_context = "\n".join(lines)
+        else:
+            few_shot_context = ""
+
         # Call Groq
         extracted = extract_cv_data(
             cv_text,
             job["must_requirements"] or "",
             job["nice_to_have_requirements"] or "",
+            few_shot_context=few_shot_context,
         )
         if extracted is None:
             return
@@ -2363,6 +2389,8 @@ def init_db():
         jc_missing.append(("reviewed_by_user_id", "INTEGER"))
     if "reviewed_at" not in jc_cols:
         jc_missing.append(("reviewed_at", "TEXT"))
+    if "human_score" not in jc_cols:
+        jc_missing.append(("human_score", "REAL"))
     for col_name, col_type in jc_missing:
         cur.execute(f"ALTER TABLE job_candidates ADD COLUMN {col_name} {col_type}")
 

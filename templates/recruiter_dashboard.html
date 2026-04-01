@@ -959,6 +959,20 @@
         <div class="notes-section">
           <label class="notes-label">הערה למנהל הגיוס:</label>
           <textarea class="notes-textarea" id="candidateNotes" placeholder="הזיני הערות או הערכות נוספות..."></textarea>
+          <div style="margin-top:12px;">
+            <label style="font-size:13px;font-weight:600;color:#4a5568;display:block;margin-bottom:6px;">
+              ציון לפי דעתך (0-100) — אופציונלי
+            </label>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <input type="range" id="humanScoreSlider" min="0" max="100" value="50" disabled
+                     style="flex:1;" oninput="document.getElementById('humanScoreDisplay').textContent=this.value+'%'">
+              <span id="humanScoreDisplay" style="font-size:14px;font-weight:700;color:#667eea;min-width:40px;">50%</span>
+              <label style="font-size:12px;color:#a0aec0;display:flex;align-items:center;gap:4px;">
+                <input type="checkbox" id="humanScoreEnabled" onchange="document.getElementById('humanScoreSlider').disabled=!this.checked">
+                תן ציון
+              </label>
+            </div>
+          </div>
         </div>
 
         <button class="submit-btn" onclick="submitCandidateReview()">שלח הערכה</button>
@@ -985,7 +999,6 @@
 
     async function submitCandidateReview() {
       const notes = document.getElementById('candidateNotes').value.trim();
- 
 
       const profile = document.getElementById('candidateProfile');
       const finalStatus = (profile && profile.dataset.selectedStatus) || selectedRecruiterStatus;
@@ -995,18 +1008,27 @@
         return;
       }
 
+      const humanScoreEnabled = document.getElementById('humanScoreEnabled').checked;
+      const humanScoreSlider = document.getElementById('humanScoreSlider');
+      const humanScore = humanScoreEnabled ? parseFloat(humanScoreSlider.value) : null;
+
+      const reviewPayload = {
+        job_id: currentJobId,
+        cv_id: currentCandidateId,
+        status: finalStatus,
+        feedback: notes
+      };
+      if (humanScore !== null) {
+        reviewPayload.human_score = humanScore;
+      }
+
       try {
         const res = await fetch('/api/recruiter/review', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            job_id: currentJobId,
-            cv_id: currentCandidateId,
-            status: finalStatus,
-            feedback: notes
-          })
+          body: JSON.stringify(reviewPayload)
         });
 
         const data = await res.json();

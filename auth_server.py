@@ -17,7 +17,8 @@ from src.anonymizer import anonymize_docx_file, anonymize_pdf_file
 from src.utils.db import upsert_candidate
 from src.utils import db as dbutil
 from src.text_extractors.universal import extract_text_any
-from src.run_scoring import infer_birth_year_simple, age_from_birth_year, apply_age_penalty
+from src.run_scoring import age_from_birth_year, apply_age_penalty
+from src.extractors.age_extractor import infer_birth_year as _infer_birth_year_advanced
 from src.scoring.experience_score import extract_estimated_experience_years
 from src.text_extractors.universal import extract_text_any
 from src.scoring.experience_score import (
@@ -69,7 +70,12 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 app = Flask(__name__)
 app.secret_key = "dev-secret-change-me"   # להחליף בסוד אמיתי בפרודקשן
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload
 CORS(app)
+
+@app.errorhandler(413)
+def request_entity_too_large(e):
+    return jsonify({"success": False, "message": "הקובץ גדול מדי. גודל מקסימלי מותר: 10MB"}), 413
 def allowed_file(filename: str) -> bool:
     _, ext = os.path.splitext(filename.lower())
     return ext in ALLOWED_EXTENSIONS
@@ -506,6 +512,94 @@ def recruiter_review():
         session["user_id"],
     )
     return jsonify({"success": True, "message": "הסקירה נשמרה בהצלחה"})
+
+
+# -----------------סטטיסטיקות מגייס-----------------
+@app.route("/api/recruiter/stats", methods=["GET"])
+def recruiter_stats():
+    """
+    Returns aggregated dashboard statistics for the current recruiter:
+    job counts (active/closed/recent) and candidate counts by status.
+    Scoped to the same manager_key as /api/jobs.
+    """
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
+    user_id = session["user_id"]
+    role = session.get("role")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    manager_key = None
+    if role == "DEVOPS":
+        manager_key = None
+    elif role == "HR_LEAD":
+        manager_key = user_id
+    elif role in ("HR_MANAGER", "RECRUITER"):
+        cur.execute("SELECT manager_id FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        if row and row["manager_id"]:
+            manager_key = row["manager_id"]
+    else:
+        conn.close()
+        return jsonify({"success": False, "message": "אין הרשאה"}), 403
+
+    manager_filter_jobs = "WHERE j.manager_id = ?" if manager_key is not None else ""
+    manager_filter_jc   = "AND j.manager_id = ?"   if manager_key is not None else ""
+    params_one  = (manager_key,) if manager_key is not None else ()
+    params_two  = (manager_key,) if manager_key is not None else ()
+
+    # --- Job stats ---
+    cur.execute(f"""
+        SELECT
+          COUNT(CASE WHEN j.is_active = 1 THEN 1 END)                                              AS total_active,
+          COUNT(CASE WHEN j.is_active = 0 THEN 1 END)                                              AS total_closed,
+          COUNT(CASE WHEN j.is_active = 1 AND j.created_at >= datetime('now', 'localtime', '-1 day')  THEN 1 END) AS opened_24h,
+          COUNT(CASE WHEN j.is_active = 1 AND j.created_at >= datetime('now', 'localtime', '-7 days') THEN 1 END) AS opened_7d
+        FROM jobs j
+        {manager_filter_jobs}
+    """, params_one)
+    job_row = cur.fetchone()
+
+    # --- Candidate stats ---
+    cur.execute(f"""
+        SELECT
+          COUNT(*)                                                                                           AS total,
+          COUNT(CASE WHEN jc.linked_at >= datetime('now', 'localtime', '-1 day')  THEN 1 END)              AS new_24h,
+          COUNT(CASE WHEN jc.linked_at >= datetime('now', 'localtime', '-7 days') THEN 1 END)              AS new_7d,
+          COUNT(CASE WHEN jc.recruiter_status IS NULL OR jc.recruiter_status = 'new' THEN 1 END)           AS awaiting,
+          COUNT(CASE WHEN jc.recruiter_status = 'מתאים'    THEN 1 END)                                     AS suitable,
+          COUNT(CASE WHEN jc.recruiter_status = 'יש לבדוק' THEN 1 END)                                     AS review,
+          COUNT(CASE WHEN jc.recruiter_status = 'לא מתאים' THEN 1 END)                                     AS not_suitable
+        FROM job_candidates jc
+        JOIN jobs j ON j.id = jc.job_id
+        WHERE j.is_active = 1
+        {manager_filter_jc}
+    """, params_two)
+    cand_row = cur.fetchone()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "jobs": {
+            "total_active":  job_row["total_active"]  if job_row else 0,
+            "total_closed":  job_row["total_closed"]  if job_row else 0,
+            "opened_24h":    job_row["opened_24h"]    if job_row else 0,
+            "opened_7d":     job_row["opened_7d"]     if job_row else 0,
+        },
+        "candidates": {
+            "total":         cand_row["total"]        if cand_row else 0,
+            "new_24h":       cand_row["new_24h"]      if cand_row else 0,
+            "new_7d":        cand_row["new_7d"]       if cand_row else 0,
+            "awaiting":      cand_row["awaiting"]     if cand_row else 0,
+            "suitable":      cand_row["suitable"]     if cand_row else 0,
+            "review":        cand_row["review"]       if cand_row else 0,
+            "not_suitable":  cand_row["not_suitable"] if cand_row else 0,
+        },
+    })
+
+
 # -----------------רשימת משרות קיימות-----------------
 @app.route("/api/jobs", methods=["GET"])
 def list_jobs():
@@ -556,8 +650,7 @@ def list_jobs():
                 j.is_active,
                 COUNT(jc.cv_id) AS matched_count
             FROM jobs j
-            LEFT JOIN job_candidates jc
-                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
+            LEFT JOIN job_candidates jc ON jc.job_id = j.id
             WHERE j.is_active = 1
             AND j.manager_id = ?
             GROUP BY j.id, j.title, j.location, j.created_at, j.is_active
@@ -578,8 +671,7 @@ def list_jobs():
                 j.is_active,
                 COUNT(jc.cv_id) AS matched_count
             FROM jobs j
-            LEFT JOIN job_candidates jc
-                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
+            LEFT JOIN job_candidates jc ON jc.job_id = j.id
             WHERE j.is_active = 1
             GROUP BY j.id, j.title, j.location, j.created_at, j.is_active
             ORDER BY j.created_at DESC
@@ -610,12 +702,25 @@ def extract_skills(text: str) -> str | None:
         return None
 
     skills_keywords = [
-        "python", "java", "c++", "c#", "javascript", "typescript",
-        "react", "node", "node.js", "express", "html", "css",
-        "sql", "mysql", "postgresql", "mongodb",
-        "docker", "kubernetes", "aws", "azure", "gcp",
-        "git", "linux", "flask", "django", "fastapi",
-        "tensorflow", "keras", "pandas", "numpy"
+        # Programming languages
+        "python", "java", "c++", "c#", "javascript", "typescript", "php", "ruby", "swift", "kotlin", "go",
+        # Web / frontend
+        "react", "angular", "vue", "node", "node.js", "express", "html", "css", "jquery",
+        # Databases
+        "sql", "mysql", "postgresql", "mongodb", "sqlite", "oracle", "redis",
+        # DevOps / cloud
+        "docker", "kubernetes", "aws", "azure", "gcp", "git", "linux", "jenkins", "terraform",
+        # Python / ML frameworks
+        "flask", "django", "fastapi", "tensorflow", "keras", "pandas", "numpy", "scikit",
+        # Office tools
+        "excel", "word", "powerpoint", "outlook", "access", "office", "microsoft office",
+        # Design / CAD
+        "autocad", "sketchup", "revit", "photoshop", "illustrator", "indesign", "figma", "canva",
+        # ERP / PM / BI
+        "sap", "priority", "salesforce", "monday", "jira", "trello", "notion", "asana",
+        "powerbi", "power bi", "tableau", "qlik", "looker",
+        # Other common tools
+        "matlab", "spss", "r",
     ]
 
     text_lower = text.lower()
@@ -825,8 +930,7 @@ def list_closed_jobs():
                 j.closed_reason,
                 COUNT(jc.cv_id) AS matched_count
             FROM jobs j
-            LEFT JOIN job_candidates jc
-                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
+            LEFT JOIN job_candidates jc ON jc.job_id = j.id
             WHERE j.is_active = 0
               AND j.manager_id = ?
             GROUP BY j.id
@@ -846,8 +950,7 @@ def list_closed_jobs():
                 j.closed_reason,
                 COUNT(jc.cv_id) AS matched_count
             FROM jobs j
-            LEFT JOIN job_candidates jc
-                ON jc.job_id = j.id AND jc.recruiter_status = 'מתאים'
+            LEFT JOIN job_candidates jc ON jc.job_id = j.id
             WHERE j.is_active = 0
             GROUP BY j.id
             ORDER BY j.closed_at DESC
@@ -915,23 +1018,26 @@ def list_job_candidates(job_id):
             {"success": False, "message": "אין לך הרשאה לצפות במועמדים למשרה"}
         ), 403
 
+    # allow_closed=1 lets HR_LEAD / HR_MANAGER view candidates of closed jobs (read-only)
+    allow_closed = request.args.get("allow_closed") == "1" and role in ("HR_LEAD", "HR_MANAGER", "DEVOPS")
+    active_filter = "" if allow_closed else "AND is_active = 1"
+
     # בודקים שהמשרה קיימת ושהיא שייכת למנהל הרלוונטי
     if manager_key is not None:
         cur.execute(
-            """
-            SELECT id, title, manager_id
+            f"""
+            SELECT id, title, manager_id, is_active, closed_reason
             FROM jobs
-            WHERE id = ? AND is_active = 1 AND manager_id = ?
+            WHERE id = ? {active_filter} AND manager_id = ?
             """,
             (job_id, manager_key),
         )
     else:
-        # DEVOPS – רק לוודא שהמשרה קיימת ופעילה
         cur.execute(
-            """
-            SELECT id, title, manager_id
+            f"""
+            SELECT id, title, manager_id, is_active, closed_reason
             FROM jobs
-            WHERE id = ? AND is_active = 1
+            WHERE id = ? {active_filter}
             """,
             (job_id,),
         )
@@ -943,12 +1049,28 @@ def list_job_candidates(job_id):
             {"success": False, "message": "המשרה לא נמצאה או שאין לך הרשאה אליה"}
         ), 404
 
+    # --- pagination params (optional, safe defaults) ---
+    try:
+        page     = max(1, int(request.args.get("page", 1)))
+        per_page = min(100, max(1, int(request.args.get("per_page", 20))))
+    except (ValueError, TypeError):
+        page, per_page = 1, 20
+
+    # count total first
+    cur.execute("SELECT COUNT(*) FROM job_candidates WHERE job_id = ?", (job_id,))
+    total = cur.fetchone()[0]
+    pages = max(1, (total + per_page - 1) // per_page)
+    offset = (page - 1) * per_page
+
     # עכשיו מביאים את המועמדים למשרה הזו
     cur.execute(
         """
         SELECT
             jc.cv_id,
             jc.linked_at,
+            jc.reviewed_at,
+            jc.reviewed_by_user_id,
+            u_reviewer.email   AS reviewer_email,
 
             c.file_path,
             c.education,
@@ -976,10 +1098,13 @@ def list_job_candidates(job_id):
             ON jc.cv_id = c.cv_id
         LEFT JOIN cv_scores AS cs
             ON jc.cv_id = cs.cv_id AND jc.job_id = cs.job_id
+        LEFT JOIN users AS u_reviewer
+            ON u_reviewer.id = jc.reviewed_by_user_id
         WHERE jc.job_id = ?
         ORDER BY jc.linked_at DESC
+        LIMIT ? OFFSET ?
         """,
-        (job_id,),
+        (job_id, per_page, offset),
     )
 
     rows = cur.fetchall()
@@ -998,6 +1123,7 @@ def list_job_candidates(job_id):
         # Regex-based fallbacks (less reliable on anonymized CVs)
         experience = None
         skills = None
+        cv_text = ""
         try:
             cv_text = extract_text_any(row["file_path"]) if row["file_path"] else ""
             experience = extract_estimated_experience_years(cv_text)
@@ -1007,16 +1133,17 @@ def list_job_candidates(job_id):
 
         # LLM-extracted values take priority (clean text), DB/regex used only as fallback
         final_age        = llm_data.get("estimated_age") or row["age"]
-        final_location   = llm_data.get("candidate_city")
+        final_location   = llm_data.get("candidate_city") or (
+            extract_candidate_city(cv_text) if cv_text else None
+        )
         final_experience = llm_data.get("years_of_experience") or experience
-        # Don't fall back to garbled OCR text from DB for education/summary
-        final_education  = llm_data.get("education")
-        final_summary    = llm_data.get("professional_summary")
-        llm_skills       = llm_data.get("skills")  # list from LLM
+        final_education  = llm_data.get("education") or row["education"] or None
+        final_summary    = llm_data.get("professional_summary") or row["professional_summary"] or None
+        llm_skills       = llm_data.get("skills")
         if llm_skills and isinstance(llm_skills, list) and llm_skills:
             final_skills = ", ".join(llm_skills)
         else:
-            final_skills = skills  # regex fallback only
+            final_skills = skills
 
         candidates.append(
             {
@@ -1038,7 +1165,8 @@ def list_job_candidates(job_id):
                 "llm_score": row["llm_score"],
                 "llm_flag": row["llm_flag"],
                 "cv_extension": os.path.splitext(row["file_path"])[1].lower() if row["file_path"] else "",
-
+                "reviewer_email": row["reviewer_email"],
+                "reviewed_at": row["reviewed_at"],
                 "scores": {
                     "age_score": row["age_score"],
                     "distance_score": row["distance_score"],
@@ -1052,8 +1180,17 @@ def list_job_candidates(job_id):
     return jsonify(
         {
             "success": True,
-            "job": {"id": job_row["id"], "title": job_row["title"]},
+            "job": {
+                "id": job_row["id"],
+                "title": job_row["title"],
+                "is_active": job_row["is_active"],
+                "closed_reason": job_row["closed_reason"],
+            },
             "candidates": candidates,
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "per_page": per_page,
         }
     )
 
@@ -1148,11 +1285,11 @@ def serve_candidate_cv_as_pdf(cv_id):
             convert(safe_path, pdf_path)
         except Exception as e:
             print(f"[docx2pdf] conversion failed: {e}")
-            # Fallback: serve original docx as download
-            return send_file(safe_path,
-                             mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                             as_attachment=True,
-                             download_name=row["file_name"] or f"cv_{cv_id}.docx")
+            # Return JSON so the frontend can show a proper placeholder + download button
+            return jsonify({"success": False, "message": "docx-preview-unavailable"}), 503
+
+    if not os.path.isfile(pdf_path):
+        return jsonify({"success": False, "message": "docx-preview-unavailable"}), 503
 
     return send_file(pdf_path, mimetype="application/pdf", as_attachment=False)
 
@@ -1527,7 +1664,8 @@ def devops_upload_cv():
     try:
         text = extract_text_any(out_path) or ""
 
-        birth_year, reason = infer_birth_year_simple(text)
+        birth_year = _infer_birth_year_advanced(text)
+        reason = "inferred" if birth_year else "none"
         age = age_from_birth_year(birth_year)
 
         base_score = 100.0
@@ -1807,7 +1945,8 @@ def upload_cv():
         text = extract_text_any(output_path) or ""
 
         # 2. זיהוי שנת לידה → גיל
-        birth_year, reason = infer_birth_year_simple(text)
+        birth_year = _infer_birth_year_advanced(text)
+        reason = "inferred" if birth_year else "none"
         age = age_from_birth_year(birth_year)
 
         # 3. ענישת גיל על בסיס 0–100 (לשקיפות + factor)
@@ -2117,6 +2256,393 @@ def api_hr_create_team_user():
         "company_name": company_name
     }), 201
 
+# -----------------API: סטטיסטיקות דשבורד HR_LEAD-----------------
+
+@app.route("/api/hr/dashboard-stats", methods=["GET"])
+@hr_manager_required
+def api_hr_dashboard_stats():
+    """
+    מחזיר נתונים אמיתיים לדשבורד מנהל HR (HR_LEAD):
+    - KPIs: משרות פעילות, מועמדים השבוע, זמן טיפול ממוצע, דיוק אלגוריתם
+    - ביצועי צוות: פר-משרה (טופלו/ממתינים, זמן, אחוז קבלה, יעילות סינון)
+    - גרף יעילות מגייסים
+    - פידבק על דיוק האלגוריתם (מקרים בהם ציון אנושי שונה מציון המערכת)
+    """
+    manager_id = session["user_id"]
+    conn = get_db()
+    cur = conn.cursor()
+
+    # --- KPI 1: משרות פעילות ---
+    cur.execute(
+        "SELECT COUNT(*) FROM jobs WHERE is_active=1 AND manager_id=?",
+        (manager_id,)
+    )
+    active_jobs = cur.fetchone()[0]
+
+    # --- KPI 2: מועמדים שנוספו ב-7 הימים האחרונים ---
+    cur.execute("""
+        SELECT COUNT(*) FROM job_candidates jc
+        JOIN jobs j ON j.id = jc.job_id
+        WHERE j.manager_id = ?
+          AND jc.linked_at >= datetime('now', 'localtime', '-7 days')
+    """, (manager_id,))
+    candidates_this_week = cur.fetchone()[0]
+
+    # --- KPI 3: זמן טיפול ממוצע (ימים) למועמדים שנסקרו ---
+    cur.execute("""
+        SELECT ROUND(AVG(julianday(jc.reviewed_at) - julianday(jc.linked_at)), 1)
+        FROM job_candidates jc
+        JOIN jobs j ON j.id = jc.job_id
+        WHERE j.manager_id = ? AND jc.reviewed_at IS NOT NULL
+    """, (manager_id,))
+    row = cur.fetchone()
+    avg_handling_days = row[0] if row and row[0] is not None else None
+
+    # --- KPI 4: דיוק אלגוריתם (% מקרים בהם LLM ואלגו הסכימו) ---
+    cur.execute("""
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN cs.llm_flag = 0 THEN 1 ELSE 0 END) as agreed
+        FROM cv_scores cs
+        JOIN jobs j ON j.id = cs.job_id
+        WHERE j.manager_id = ? AND cs.llm_flag IS NOT NULL
+    """, (manager_id,))
+    acc_row = cur.fetchone()
+    if acc_row and acc_row["total"] and acc_row["total"] > 0:
+        algo_accuracy = round(acc_row["agreed"] / acc_row["total"] * 100)
+    else:
+        algo_accuracy = None
+
+    # --- ביצועי צוות: נתוני פר-משרה ---
+    cur.execute("""
+        SELECT
+            j.id                                                                          AS job_id,
+            j.title                                                                       AS job_title,
+            COUNT(jc.cv_id)                                                               AS total_candidates,
+            SUM(CASE WHEN jc.recruiter_status IS NOT NULL
+                          AND jc.recruiter_status != 'new' THEN 1 ELSE 0 END)            AS processed,
+            SUM(CASE WHEN jc.recruiter_status IS NULL
+                          OR jc.recruiter_status = 'new'  THEN 1 ELSE 0 END)             AS pending,
+            ROUND(AVG(CASE WHEN jc.reviewed_at IS NOT NULL
+                           THEN julianday(jc.reviewed_at) - julianday(jc.linked_at)
+                           END), 1)                                                       AS avg_handling_days,
+            SUM(CASE WHEN jc.recruiter_status = 'מתאים' THEN 1 ELSE 0 END)              AS accepted_count,
+            (SELECT u2.email
+             FROM job_candidates jc2
+             JOIN users u2 ON u2.id = jc2.reviewed_by_user_id
+             WHERE jc2.job_id = j.id AND jc2.reviewed_by_user_id IS NOT NULL
+             GROUP BY jc2.reviewed_by_user_id
+             ORDER BY COUNT(*) DESC
+             LIMIT 1)                                                                     AS recruiter_email
+        FROM jobs j
+        LEFT JOIN job_candidates jc ON jc.job_id = j.id
+        WHERE j.manager_id = ? AND j.is_active = 1
+        GROUP BY j.id
+        ORDER BY total_candidates DESC
+    """, (manager_id,))
+    job_rows = cur.fetchall()
+
+    team_performance = []
+    for r in job_rows:
+        processed = r["processed"] or 0
+        total = r["total_candidates"] or 0
+        accepted = r["accepted_count"] or 0
+        acceptance_rate = round(accepted / processed * 100) if processed > 0 else 0
+        filtering_efficiency = round(processed / total * 100) if total > 0 else 0
+        team_performance.append({
+            "job_id":               r["job_id"],
+            "job_title":            r["job_title"],
+            "recruiter_email":      r["recruiter_email"] or "",
+            "processed":            processed,
+            "pending":              r["pending"] or 0,
+            "avg_handling_days":    r["avg_handling_days"],
+            "acceptance_rate":      acceptance_rate,
+            "filtering_efficiency": filtering_efficiency,
+        })
+
+    # --- גרף יעילות סינון לפי מגייס ---
+    # סך כל המועמדים למשרות המנהל (מכנה משותף)
+    cur.execute("""
+        SELECT COUNT(*) FROM job_candidates jc
+        JOIN jobs j ON j.id = jc.job_id
+        WHERE j.manager_id = ?
+    """, (manager_id,))
+    total_all = cur.fetchone()[0] or 0
+
+    cur.execute("""
+        SELECT u.id, u.email,
+               COUNT(jc.cv_id) AS reviewed_count
+        FROM users u
+        LEFT JOIN job_candidates jc
+               ON jc.reviewed_by_user_id = u.id
+              AND jc.job_id IN (SELECT id FROM jobs WHERE manager_id = ?)
+        WHERE u.manager_id = ? AND u.role IN ('RECRUITER', 'HR_MANAGER')
+        GROUP BY u.id
+        ORDER BY reviewed_count DESC
+    """, (manager_id, manager_id))
+    recruiter_rows = cur.fetchall()
+
+    recruiter_chart = []
+    for r in recruiter_rows:
+        reviewed = r["reviewed_count"] or 0
+        efficiency_pct = round(reviewed / total_all * 100) if total_all > 0 else 0
+        recruiter_chart.append({
+            "email":          r["email"],
+            "reviewed_count": reviewed,
+            "efficiency_pct": efficiency_pct,
+        })
+
+    # --- פידבק על דיוק האלגוריתם ---
+    # מקרים שבהם ציון אנושי שונה מציון המערכת ב-10 נקודות ומעלה
+    cur.execute("""
+        SELECT
+            jc.cv_id,
+            jc.job_id,
+            j.title                                               AS job_title,
+            u.email                                               AS reviewer_email,
+            ROUND(cs.final_score)                                 AS algo_score,
+            ROUND(jc.human_score)                                 AS human_score
+        FROM job_candidates jc
+        JOIN jobs j         ON j.id = jc.job_id
+        JOIN cv_scores cs   ON cs.job_id = jc.job_id AND cs.cv_id = jc.cv_id
+        LEFT JOIN users u   ON u.id = jc.reviewed_by_user_id
+        WHERE j.manager_id = ?
+          AND jc.human_score IS NOT NULL
+          AND ABS(jc.human_score - cs.final_score) > 10
+        ORDER BY ABS(jc.human_score - cs.final_score) DESC
+        LIMIT 10
+    """, (manager_id,))
+    feedback_rows = cur.fetchall()
+
+    algo_feedback = []
+    for r in feedback_rows:
+        direction = "high" if (r["human_score"] or 0) < (r["algo_score"] or 0) else "low"
+        algo_feedback.append({
+            "cv_id":          r["cv_id"],
+            "job_id":         r["job_id"],
+            "job_title":      r["job_title"] or "",
+            "reviewer_email": r["reviewer_email"] or "",
+            "algo_score":     r["algo_score"] or 0,
+            "human_score":    r["human_score"] or 0,
+            "direction":      direction,
+        })
+
+    # אם אין מקרים עם ציון אנושי, הצג מקרים עם llm_flag=1
+    if not algo_feedback:
+        cur.execute("""
+            SELECT
+                cs.cv_id,
+                cs.job_id,
+                j.title             AS job_title,
+                ROUND(cs.final_score) AS algo_score
+            FROM cv_scores cs
+            JOIN jobs j ON j.id = cs.job_id
+            WHERE j.manager_id = ? AND cs.llm_flag = 1
+            ORDER BY cs.cv_id DESC
+            LIMIT 10
+        """, (manager_id,))
+        llm_flag_rows = cur.fetchall()
+        for r in llm_flag_rows:
+            algo_feedback.append({
+                "cv_id":          r["cv_id"],
+                "job_id":         r["job_id"],
+                "job_title":      r["job_title"] or "",
+                "reviewer_email": "",
+                "algo_score":     r["algo_score"] or 0,
+                "human_score":    None,
+                "direction":      "unknown",
+            })
+
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "kpis": {
+            "active_jobs":         active_jobs,
+            "candidates_this_week": candidates_this_week,
+            "avg_handling_days":   avg_handling_days,
+            "algo_accuracy":       algo_accuracy,
+        },
+        "team_performance": team_performance,
+        "recruiter_chart":  recruiter_chart,
+        "algo_feedback":    algo_feedback,
+    })
+
+
+# -----------------API: שמירת פידבק HR_LEAD על דיוק האלגוריתם-----------------
+
+@app.route("/api/hr/algo-feedback", methods=["POST"])
+@hr_manager_required
+def api_hr_algo_feedback():
+    """שומר פידבק של HR_LEAD (ציון גבוה/נמוך מדי) בעמודת hr_lead_feedback בטבלת cv_scores."""
+    manager_id = session["user_id"]
+    data = request.get_json() or {}
+
+    cv_id   = data.get("cv_id")
+    job_id  = data.get("job_id")
+    direction = (data.get("direction") or "").strip().lower()
+
+    if not cv_id or not job_id or direction not in ("high", "low"):
+        return jsonify({"success": False, "message": "נתונים חסרים או שגויים"}), 400
+
+    conn = get_db()
+    cur  = conn.cursor()
+
+    # וידוא שהמשרה שייכת למנהל המחובר
+    cur.execute("SELECT id FROM jobs WHERE id=? AND manager_id=?", (job_id, manager_id))
+    if not cur.fetchone():
+        conn.close()
+        return jsonify({"success": False, "message": "אין הרשאה למשרה זו"}), 403
+
+    cur.execute(
+        "UPDATE cv_scores SET hr_lead_feedback=? WHERE job_id=? AND cv_id=?",
+        (direction, job_id, cv_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "הפידבק נשמר בהצלחה"})
+
+
+# -----------------API: דוחות HR_LEAD-----------------
+
+@app.route("/api/hr/reports", methods=["GET"])
+@hr_manager_required
+def api_hr_reports():
+    """
+    מחזיר סיכום דוחות לפי טווח ימים (days=7|30|all).
+    פר-משרה: סה"כ מועמדים, נסקרו, התקבלו, ציון ממוצע.
+    """
+    manager_id = session["user_id"]
+    days_param = request.args.get("days", "all")
+
+    if days_param == "7":
+        date_filter = "AND jc.linked_at >= datetime('now','localtime','-7 days')"
+    elif days_param == "30":
+        date_filter = "AND jc.linked_at >= datetime('now','localtime','-30 days')"
+    else:
+        date_filter = ""
+
+    conn = get_db()
+    cur  = conn.cursor()
+
+    cur.execute(f"""
+        SELECT
+            j.id                                                                AS job_id,
+            j.title                                                             AS job_title,
+            j.location,
+            COUNT(jc.cv_id)                                                     AS total,
+            SUM(CASE WHEN jc.recruiter_status IS NOT NULL
+                          AND jc.recruiter_status != 'new' THEN 1 ELSE 0 END)  AS reviewed,
+            SUM(CASE WHEN jc.recruiter_status = 'מתאים' THEN 1 ELSE 0 END)    AS accepted,
+            ROUND(AVG(cs.final_score), 1)                                       AS avg_score
+        FROM jobs j
+        LEFT JOIN job_candidates jc ON jc.job_id = j.id {date_filter}
+        LEFT JOIN cv_scores cs      ON cs.job_id  = jc.job_id AND cs.cv_id = jc.cv_id
+        WHERE j.manager_id = ?
+        GROUP BY j.id
+        ORDER BY total DESC
+    """, (manager_id,))
+    rows = cur.fetchall()
+    conn.close()
+
+    jobs_report = []
+    for r in rows:
+        total    = r["total"] or 0
+        reviewed = r["reviewed"] or 0
+        accepted = r["accepted"] or 0
+        jobs_report.append({
+            "job_id":        r["job_id"],
+            "job_title":     r["job_title"] or "",
+            "location":      r["location"] or "",
+            "total":         total,
+            "reviewed":      reviewed,
+            "accepted":      accepted,
+            "acceptance_pct": round(accepted / reviewed * 100) if reviewed > 0 else 0,
+            "avg_score":     r["avg_score"],
+        })
+
+    return jsonify({"success": True, "jobs": jobs_report, "days": days_param})
+
+
+# -----------------API: הגדרות HR_LEAD-----------------
+
+@app.route("/api/hr/settings", methods=["PATCH"])
+@hr_manager_required
+def api_hr_settings():
+    """מעדכן שם חברה של HR_LEAD."""
+    manager_id = session["user_id"]
+    data = request.get_json() or {}
+
+    company_name = (data.get("company_name") or "").strip()
+    if not company_name:
+        return jsonify({"success": False, "message": "שם חברה לא יכול להיות ריק"}), 400
+
+    conn = get_db()
+    conn.execute("UPDATE users SET company_name=? WHERE id=?", (company_name, manager_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "ההגדרות עודכנו בהצלחה"})
+
+
+# -----------------API: פייפליין מועמדים HR_LEAD-----------------
+
+@app.route("/api/hr/candidate-pipeline", methods=["GET"])
+@hr_manager_required
+def api_hr_candidate_pipeline():
+    """
+    מחזיר ספירת מועמדים לפי שלב (stage) פר-משרה, לדשבורד HR_LEAD.
+    שלבים: new, phone_interview, first_interview, accepted, rejected.
+    """
+    manager_id = session["user_id"]
+    conn = get_db()
+    cur  = conn.cursor()
+
+    # שלבים + ספירת מועמדים חדשים (לא נסקרו) מ-job_candidates
+    cur.execute("""
+        SELECT
+            j.id    AS job_id,
+            j.title AS job_title,
+            SUM(CASE WHEN jc.recruiter_status IS NULL
+                          OR jc.recruiter_status = 'new' THEN 1 ELSE 0 END) AS stage_new,
+            SUM(CASE WHEN jc.recruiter_status = 'יש לבדוק' THEN 1 ELSE 0 END) AS stage_review
+        FROM jobs j
+        LEFT JOIN job_candidates jc ON jc.job_id = j.id
+        WHERE j.manager_id = ? AND j.is_active = 1
+        GROUP BY j.id
+    """, (manager_id,))
+    job_rows = {r["job_id"]: dict(r) for r in cur.fetchall()}
+
+    # שלבים מ-candidate_progress_events
+    cur.execute("""
+        SELECT
+            cpe.job_id,
+            cpe.stage,
+            COUNT(DISTINCT cpe.cv_id) AS cnt
+        FROM candidate_progress_events cpe
+        JOIN jobs j ON j.id = cpe.job_id
+        WHERE j.manager_id = ? AND cpe.stage IS NOT NULL
+        GROUP BY cpe.job_id, cpe.stage
+    """, (manager_id,))
+    for r in cur.fetchall():
+        jid = r["job_id"]
+        if jid in job_rows:
+            job_rows[jid][f"stage_{r['stage']}"] = r["cnt"]
+
+    conn.close()
+
+    STAGE_KEYS = ["new", "review", "phone_interview", "first_interview", "accepted", "rejected"]
+    pipeline = []
+    for jid, row in job_rows.items():
+        pipeline.append({
+            "job_id":    jid,
+            "job_title": row.get("job_title") or "",
+            "stages": {s: row.get(f"stage_{s}", 0) for s in STAGE_KEYS},
+        })
+
+    return jsonify({"success": True, "pipeline": pipeline})
+
+
 # -----------------API: סטטיסטיקות כלליות לדשבורד DevOps-----------------
 
 @app.route("/api/admin/stats", methods=["GET"])
@@ -2394,7 +2920,7 @@ def init_db():
     for col_name, col_type in jc_missing:
         cur.execute(f"ALTER TABLE job_candidates ADD COLUMN {col_name} {col_type}")
 
-    # --- migration: add llm columns to cv_scores if missing ---
+    # --- migration: add llm columns + hr_lead_feedback to cv_scores if missing ---
     cs_cols = {row[1] for row in cur.execute("PRAGMA table_info(cv_scores)").fetchall()}
     if "llm_score" not in cs_cols:
         cur.execute("ALTER TABLE cv_scores ADD COLUMN llm_score REAL")
@@ -2402,6 +2928,8 @@ def init_db():
         cur.execute("ALTER TABLE cv_scores ADD COLUMN llm_flag INTEGER DEFAULT 0")
     if "llm_extracted" not in cs_cols:
         cur.execute("ALTER TABLE cv_scores ADD COLUMN llm_extracted TEXT")
+    if "hr_lead_feedback" not in cs_cols:
+        cur.execute("ALTER TABLE cv_scores ADD COLUMN hr_lead_feedback TEXT")
 
     # --- migration: add last_login to users if missing ---
     u_cols = {row[1] for row in cur.execute("PRAGMA table_info(users)").fetchall()}

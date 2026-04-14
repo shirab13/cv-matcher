@@ -565,323 +565,89 @@
       </div>
       <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-number">
-        47
-        </div>
-        <div class="stat-label">
-         משרות פעילות
-        </div>
+        <div class="stat-number" id="statActiveJobs">—</div>
+        <div class="stat-label">משרות פעילות</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">
-         312
-        </div>
-        <div class="stat-label">
-         מועמדים השבוע
-        </div>
+        <div class="stat-number" id="statCandidatesWeek">—</div>
+        <div class="stat-label">מועמדים השבוע</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">
-        2.3
-        </div>
-        <div class="stat-label">
-         ימים זמן טיפול ממוצע
-        </div>
+        <div class="stat-number" id="statAvgHandling">—</div>
+        <div class="stat-label">ימים זמן טיפול ממוצע</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">
-        78%
-        </div>
-        <div class="stat-label">
-         דיוק אלגוריתם
-        </div>
+        <div class="stat-number" id="statAlgoAccuracy">—</div>
+        <div class="stat-label">דיוק אלגוריתם</div>
       </div>
       </div>
       <section>
       <h2 class="section-title" id="teamPerformanceTitle">📊 ביצועי צוות הגיוס</h2>
+      <!-- חיפוש בטבלת ביצועים -->
+      <div style="margin-bottom:12px;">
+        <input type="text" id="perfSearchInput" placeholder="סינון לפי שם משרה..."
+               oninput="filterPerfTable()"
+               style="padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:14px; width:260px;">
+      </div>
       <div class="jobs-table">
         <div class="table-header">
         <div class="job-info">
-          <div>
-           משרה ומגייס
-          </div>
-          <div>
-           טופלו/ממתינים
-          </div>
-          <div>
-           זמן טיפול ממוצע
-          </div>
-          <div>
-           זמן תגובה ממוצע
-          </div>
-          <div>
-           אחוז קבלה
-          </div>
-          <div>
-           יעילות סינון
-          </div>
+          <div>משרה ומגייס</div>
+          <div>טופלו/ממתינים</div>
+          <div>זמן טיפול ממוצע</div>
+          <div>אחוז קבלה</div>
+          <div>יעילות סינון</div>
         </div>
         </div>
-        <div class="table-row">
-        <div class="job-info">
-          <div>
-          <div class="job-title">
-          מפתח  Full Stack
-          </div>
-          <div class="job-recruiter">
-           רחל כהן
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            18/6
-          </div>
-          <div class="metric-label">
-           טופלו/ממתינים
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            1.8 ימים
-          </div>
-          <div class="metric-label">
-           זמן טיפול
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            3.2 ימים
-          </div>
-          <div class="metric-label">
-           זמן תגובה
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            72%
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 72%"></div>
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            85%
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 85%"></div>
-          </div>
-          </div>
-        </div>
-        </div>
-        <div class="table-row">
-        <div class="job-info">
-          <div>
-          <div class="job-title">
-           מנהל פרויקטים
-          </div>
-          <div class="job-recruiter">
-           דני לוי
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            12/4
-          </div>
-          <div class="metric-label">
-           טופלו/ממתינים
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            2.1 ימים
-          </div>
-          <div class="metric-label">
-           זמן טיפול
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            2.8 ימים
-          </div>
-          <div class="metric-label">
-           זמן תגובה
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            68%
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 68%"></div>
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            79%
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 79%"></div>
-          </div>
-          </div>
-        </div>
-        </div>
-        <div class="table-row">
-         <div class="job-info">
-          <div>
-          <div class="job-title">
-           מעצב UX/UI
-          </div>
-          <div class="job-recruiter">
-           שרה אברהם
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            25/9
-          </div>
-          <div class="metric-label">
-           טופלו/ממתינים
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            1.5 ימים
-          </div>
-          <div class="metric-label">
-           זמן טיפול
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-            4.1 ימים
-          </div>
-          <div class="metric-label">
-           זמן תגובה
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-           81%
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 81%"></div>
-          </div>
-          </div>
-          <div>
-          <div class="metric-value">
-           92%
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 92%"></div>
-          </div>
-          </div>
-        </div>
+        <div id="teamPerformanceBody">
+          <!-- שורות הביצועים יוזרקו כאן ע"י JS -->
+          <div class="table-row"><div style="padding:16px;color:#718096;">טוען נתונים...</div></div>
         </div>
       </div>
       </section>
       <section>
       <div class="chart-container">
         <h3 class="chart-title">יעילות סינון לפי מגייס</h3>
-        <div class="chart">
-         <div class="chart-bar">
-          <div class="bar" style="height: 85px;">
-          <div class="bar-value">
-            85%
-          </div>
-          </div>
-          <div class="bar-label">
-           רחל כהן
-          </div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar" style="height: 79px;">
-          <div class="bar-value">
-            79%
-          </div>
-          </div>
-          <div class="bar-label">
-           דני לוי
-          </div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar" style="height: 92px;">
-          <div class="bar-value">
-           92%
-          </div>
-          </div>
-          <div class="bar-label">
-           שרה אברהם
-          </div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar" style="height: 76px;">
-          <div class="bar-value">
-            76%
-          </div>
-          </div>
-          <div class="bar-label">
-           יוסי דוד
-          </div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar" style="height: 88px;">
-          <div class="bar-value">
-            88%
-          </div>
-          </div>
-          <div class="bar-label">
-           מיכל רון
-          </div>
-        </div>
+        <div class="chart" id="recruiterChart">
+          <!-- עמודות הגרף יוזרקו כאן ע"י JS -->
         </div>
       </div>
       </section>
+
+      <!-- ════ פייפליין מועמדים ════ -->
+      <section>
+      <h2 class="section-title">🔀 פייפליין מועמדים לפי משרה</h2>
+      <div class="jobs-table">
+        <div class="table-header">
+          <div class="job-info" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;">
+            <div>משרה</div>
+            <div>חדש</div>
+            <div>לבדיקה</div>
+            <div>שיחת טלפון</div>
+            <div>ראיון ראשון</div>
+            <div>התקבל / נדחה</div>
+          </div>
+        </div>
+        <div id="pipelineBody">
+          <div class="table-row"><div style="padding:16px;color:#718096;">טוען...</div></div>
+        </div>
+      </div>
+      </section>
+
       <section>
       <h2 class="section-title" id="jobsOverviewTitle">🎯 פידבק על דיוק האלגוריתם</h2>
-      <div class="feedback-section">
-        <div class="feedback-item">
-        <div class="candidate-info">
-          <div class="candidate-name">
-           אלון שמיר
-          </div>
-          <div class="candidate-job">
-           מפתח Full Stack - רחל כהן
-          </div>
-        </div>
-        <div class="feedback-score"><span class="score-badge score-high">ציון גבוה מדי</span> <span>92% → 75%</span>
-        </div>
-        <div class="feedback-buttons"><button class="feedback-btn btn-too-high" onclick="sendFeedback('high', 'אלון שמיר')">ציון גבוה מדי</button> <button class="feedback-btn btn-send" id="sendFeedbackBtn" onclick="sendFeedback('send', 'אלון שמיר')">שלח פידבק</button>
-        </div>
-        </div>
-        <div class="feedback-item">
-        <div class="candidate-info">
-          <div class="candidate-name">
-           נועה לוי
-          </div>
-          <div class="candidate-job">
-           מעצב UX/UI - שרה אברהם
-          </div>
-        </div>
-        <div class="feedback-score"><span class="score-badge score-low">ציון נמוך מדי</span> <span>65% → 85%</span>
-        </div>
-        <div class="feedback-buttons"><button class="feedback-btn btn-too-low" onclick="sendFeedback('low', 'נועה לוי')">ציון נמוך מדי</button> <button class="feedback-btn btn-send" onclick="sendFeedback('send', 'נועה לוי')">שלח פידבק</button>
-        </div>
-        </div>
-        <div class="feedback-item">
-        <div class="candidate-info">
-          <div class="candidate-name">
-           רון כהן
-          </div>
-          <div class="candidate-job">
-           מנהל פרויקטים - דני לוי
-          </div>
-        </div>
-        <div class="feedback-score"><span class="score-badge score-high">ציון גבוה מדי</span> <span>88% → 70%</span>
-        </div>
-        <div class="feedback-buttons"><button class="feedback-btn btn-too-high" onclick="sendFeedback('high', 'רון כהן')">ציון גבוה מדי</button> <button class="feedback-btn btn-send" onclick="sendFeedback('send', 'רון כהן')">שלח פידבק</button>
-        </div>
-        </div>
+      <!-- פילטר פידבק -->
+      <div style="margin-bottom:12px; display:flex; gap:10px;">
+        <select id="feedbackFilter" onchange="filterFeedback()"
+                style="padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:14px;">
+          <option value="all">הכל</option>
+          <option value="high">ציון גבוה מדי</option>
+          <option value="low">ציון נמוך מדי</option>
+        </select>
+      </div>
+      <div class="feedback-section" id="algoFeedbackSection">
+        <!-- פריטי פידבק יוזרקו כאן ע"י JS -->
+        <div style="padding:16px;color:#718096;">טוען נתונים...</div>
       </div>
       </section>
     </div> <!-- סוף dashboardSection -->
@@ -940,6 +706,72 @@
       </div>
     </section>
 
+    <!-- ════════ מסך דוחות ════════ -->
+    <section id="reportsSection" style="display:none;">
+      <div class="page-header">
+        <h1 class="page-title">דוחות גיוס</h1>
+        <p class="page-subtitle">סיכום ביצועים לפי טווח זמן</p>
+      </div>
+
+      <!-- פילטר + ייצוא -->
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+        <select id="reportsDaysFilter" onchange="loadReports()"
+                style="padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:14px;">
+          <option value="all">כל הזמן</option>
+          <option value="30">30 ימים אחרונים</option>
+          <option value="7">7 ימים אחרונים</option>
+        </select>
+        <button onclick="exportReportsCSV()" class="feedback-btn btn-send" style="padding:8px 16px;">
+          ייצוא CSV
+        </button>
+        <input type="text" id="reportsSearch" placeholder="חיפוש לפי שם משרה..."
+               oninput="filterReportsTable()"
+               style="padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:14px; flex:1; min-width:180px;">
+      </div>
+
+      <div class="jobs-table">
+        <div class="table-header">
+          <div class="job-info" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;">
+            <div>משרה</div><div>מיקום</div><div>סה"כ מועמדים</div>
+            <div>נסקרו</div><div>התקבלו</div><div>ציון ממוצע</div>
+          </div>
+        </div>
+        <div id="reportsTableBody">
+          <div class="table-row"><div style="padding:16px;color:#718096;">טוען...</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ מסך הגדרות ════════ -->
+    <section id="settingsSection" style="display:none;">
+      <div class="page-header">
+        <h1 class="page-title">הגדרות מערכת</h1>
+        <p class="page-subtitle">עדכון פרטי החשבון והעדפות</p>
+      </div>
+
+      <div class="feedback-section" style="max-width:480px;">
+        <h3 class="section-title" style="font-size:18px;">✏️ עדכון שם חברה</h3>
+        <form onsubmit="saveSettings(event)" style="display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <label class="metric-label" style="display:block; margin-bottom:4px;">שם חברה</label>
+            <input id="settingsCompanyName" type="text" required
+                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0; box-sizing:border-box;">
+          </div>
+          <button type="submit" class="feedback-btn btn-send" style="align-self:flex-start; padding:10px 24px;">
+            שמור שינויים
+          </button>
+        </form>
+
+        <hr style="margin:24px 0; border:none; border-top:1px solid #e2e8f0;">
+
+        <h3 class="section-title" style="font-size:18px;">🔔 התראות</h3>
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <input type="checkbox" id="settingsNotifToggle" style="width:18px; height:18px;">
+          <span class="metric-label">קבלת התראות על מועמדים חדשים</span>
+        </label>
+        <p style="font-size:12px; color:#a0aec0; margin-top:6px;">(הגדרה זו שמורה בדפדפן בלבד)</p>
+      </div>
+    </section>
 
    </main>
   </div>
@@ -1069,20 +901,16 @@
       sidebar.classList.toggle('open');
     }
 
+    const ALL_SECTIONS = ['dashboardSection','teamManagementSection','reportsSection','settingsSection'];
+
     function showSection(section) {
-      const dashboard = document.getElementById('dashboardSection');
-      const team = document.getElementById('teamManagementSection');
-
-      if (!dashboard || !team) return;
-
-      if (section === 'team') {
-        dashboard.style.display = 'none';
-        team.style.display = 'block';
-      } else {
-        // ברירת מחדל – דשבורד
-        dashboard.style.display = 'block';
-        team.style.display = 'none';
-      }
+      ALL_SECTIONS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+      const target = document.getElementById(section + 'Section') ||
+                     document.getElementById(section);
+      if (target) target.style.display = 'block';
     }
 
 
@@ -1210,28 +1038,24 @@
     function showDashboard() {
       setActiveMenuItem(0);
       showSection('dashboard');
-      showMessage('מציג דשבורד ראשי');
     }
 
     function showReports() {
       setActiveMenuItem(1);
-      // כרגע אין מסך דוחות נפרד – נשאיר את הדשבורד פתוח:
-      showSection('dashboard');
-      showMessage('מציג דוחות מפורטים');
+      showSection('reports');
+      loadReports();
     }
 
     function showTeamManagement() {
       setActiveMenuItem(2);
-      showSection('team');
+      showSection('teamManagement');
       fetchTeamUsers();
-      showMessage('מציג ניהול צוות');
     }
 
     function showSettings() {
       setActiveMenuItem(3);
-      // גם כאן – אפשר להשאיר דשבורד / להוסיף בהמשך מסך הגדרות
-      showSection('dashboard');
-      showMessage('מציג הגדרות מערכת');
+      showSection('settings');
+      loadSettingsForm();
     }
 
 
@@ -1246,16 +1070,27 @@
       });
     }
 
-    function sendFeedback(type, candidateName) {
-      let message = '';
-      if (type === 'high') {
-        message = `סומן כ"ציון גבוה מדי" עבור ${candidateName}`;
-      } else if (type === 'low') {
-        message = `סומן כ"ציון נמוך מדי" עבור ${candidateName}`;
-      } else if (type === 'send') {
-        message = `פידבק נשלח ל-DevOps עבור ${candidateName}`;
+    async function sendFeedback(type, cvId, jobId) {
+      if (type === 'send') {
+        showMessage(`פידבק נשלח עבור מועמד #${cvId}`);
+        return;
       }
-      showMessage(message);
+      try {
+        const res  = await fetch('/api/hr/algo-feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cv_id: cvId, job_id: jobId, direction: type }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          showMessage(type === 'high' ? 'סומן: ציון גבוה מדי ✓' : 'סומן: ציון נמוך מדי ✓');
+        } else {
+          showMessage(data.message || 'שגיאה בשמירת הפידבק');
+        }
+      } catch (err) {
+        console.error('[feedback]', err);
+        showMessage('שגיאה בתקשורת עם השרת');
+      }
     }
 
     function showLogoutMessage() {
@@ -1283,6 +1118,296 @@
         sidebar.classList.remove('open');
       }
     });
+
+    // ──────────────────────────────────────────────
+    // טעינת נתונים אמיתיים מה-API
+    // ──────────────────────────────────────────────
+    async function loadDashboardData() {
+      console.log('[Dashboard] fetching /api/hr/dashboard-stats …');
+      try {
+        const res = await fetch('/api/hr/dashboard-stats');
+        const data = await res.json();
+        console.log('[Dashboard] response:', data);
+
+        if (!res.ok || !data.success) {
+          console.error('[Dashboard] API error:', data.message || res.status);
+          return;
+        }
+
+        // --- KPI cards ---
+        const kpis = data.kpis || {};
+        document.getElementById('statActiveJobs').textContent =
+          kpis.active_jobs != null ? kpis.active_jobs : '—';
+        document.getElementById('statCandidatesWeek').textContent =
+          kpis.candidates_this_week != null ? kpis.candidates_this_week : '—';
+        document.getElementById('statAvgHandling').textContent =
+          kpis.avg_handling_days != null ? kpis.avg_handling_days : '—';
+        document.getElementById('statAlgoAccuracy').textContent =
+          kpis.algo_accuracy != null ? kpis.algo_accuracy + '%' : '—';
+
+        // --- טבלת ביצועי צוות ---
+        const perfBody = document.getElementById('teamPerformanceBody');
+        _perfData = data.team_performance || [];
+        if (_perfData.length === 0) {
+          perfBody.innerHTML = '<div class="table-row"><div style="padding:16px;color:#718096;">אין משרות פעילות</div></div>';
+        } else {
+          renderPerfRows(perfBody, _perfData);
+        }
+
+        // --- גרף יעילות מגייסים ---
+        const chartEl = document.getElementById('recruiterChart');
+        const chartData = data.recruiter_chart || [];
+        if (chartData.length === 0) {
+          chartEl.innerHTML = '<div style="padding:16px;color:#718096;">אין נתוני מגייסים</div>';
+        } else {
+          const maxEff = Math.max(...chartData.map(r => r.efficiency_pct), 1);
+          chartEl.innerHTML = chartData.map(r => {
+            const barH = Math.max(Math.round(r.efficiency_pct / maxEff * 120), 4);
+            const shortEmail = r.email.split('@')[0];
+            return `
+              <div class="chart-bar">
+                <div class="bar" style="height:${barH}px;">
+                  <div class="bar-value">${r.efficiency_pct}%</div>
+                </div>
+                <div class="bar-label">${shortEmail}</div>
+              </div>`;
+          }).join('');
+        }
+
+        // --- פידבק על דיוק האלגוריתם ---
+        _feedbackData = data.algo_feedback || [];
+        renderFeedbackItems(_feedbackData);
+
+      } catch (err) {
+        console.error('[Dashboard] fetch error:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDashboardData();
+      loadPipeline();
+    });
+
+    // ──────────────────────────────────────────────
+    // פייפליין מועמדים
+    // ──────────────────────────────────────────────
+    async function loadPipeline() {
+      const body = document.getElementById('pipelineBody');
+      if (!body) return;
+      try {
+        const res  = await fetch('/api/hr/candidate-pipeline');
+        const data = await res.json().catch(() => ({}));
+        console.log('[Pipeline]', data);
+        if (!res.ok || !data.success) { body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#e53e3e;">שגיאה בטעינת פייפליין</div></div>'; return; }
+        const pipeline = data.pipeline || [];
+        if (pipeline.length === 0) { body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#718096;">אין נתוני פייפליין</div></div>'; return; }
+        body.innerHTML = pipeline.map(job => `
+          <div class="table-row">
+            <div class="job-info" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;">
+              <div><div class="job-title">${job.job_title}</div></div>
+              <div><div class="metric-value">${job.stages.new}</div></div>
+              <div><div class="metric-value">${job.stages.review}</div></div>
+              <div><div class="metric-value">${job.stages.phone_interview}</div></div>
+              <div><div class="metric-value">${job.stages.first_interview}</div></div>
+              <div>
+                <span style="color:#48bb78;font-weight:600;">${job.stages.accepted}</span>
+                &nbsp;/&nbsp;
+                <span style="color:#fc8181;font-weight:600;">${job.stages.rejected}</span>
+              </div>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        console.error('[Pipeline]', err);
+        body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#e53e3e;">שגיאה</div></div>';
+      }
+    }
+
+    // ──────────────────────────────────────────────
+    // דוחות
+    // ──────────────────────────────────────────────
+    let _reportsData = [];
+
+    async function loadReports() {
+      const body   = document.getElementById('reportsTableBody');
+      const days   = document.getElementById('reportsDaysFilter')?.value || 'all';
+      if (!body) return;
+      body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#718096;">טוען...</div></div>';
+      try {
+        const res  = await fetch(`/api/hr/reports?days=${days}`);
+        const data = await res.json().catch(() => ({}));
+        console.log('[Reports]', data);
+        if (!res.ok || !data.success) { body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#e53e3e;">שגיאה</div></div>'; return; }
+        _reportsData = data.jobs || [];
+        renderReportsTable(_reportsData);
+      } catch (err) {
+        console.error('[Reports]', err);
+        body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#e53e3e;">שגיאה בתקשורת</div></div>';
+      }
+    }
+
+    function renderReportsTable(rows) {
+      const body = document.getElementById('reportsTableBody');
+      if (!body) return;
+      if (rows.length === 0) { body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#718096;">אין נתונים</div></div>'; return; }
+      body.innerHTML = rows.map(r => `
+        <div class="table-row">
+          <div class="job-info" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;">
+            <div><div class="job-title">${r.job_title}</div></div>
+            <div>${r.location || '—'}</div>
+            <div>${r.total}</div>
+            <div>${r.reviewed}</div>
+            <div>${r.accepted} <span style="color:#718096;font-size:12px;">(${r.acceptance_pct}%)</span></div>
+            <div>${r.avg_score != null ? r.avg_score : '—'}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    function filterReportsTable() {
+      const q = (document.getElementById('reportsSearch')?.value || '').toLowerCase();
+      renderReportsTable(_reportsData.filter(r => r.job_title.toLowerCase().includes(q)));
+    }
+
+    function exportReportsCSV() {
+      if (!_reportsData.length) { showMessage('אין נתונים לייצוא'); return; }
+      const headers = ['משרה','מיקום','סה"כ מועמדים','נסקרו','התקבלו','% קבלה','ציון ממוצע'];
+      const rows = _reportsData.map(r =>
+        [r.job_title, r.location, r.total, r.reviewed, r.accepted, r.acceptance_pct, r.avg_score ?? ''].join(',')
+      );
+      const csv  = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a'); a.href = url; a.download = 'reports.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ──────────────────────────────────────────────
+    // הגדרות
+    // ──────────────────────────────────────────────
+    async function loadSettingsForm() {
+      // טוען שם חברה נוכחי מ-/api/hr/team-users (כולל company_name)
+      try {
+        const res  = await fetch('/api/hr/team-users');
+        const data = await res.json().catch(() => ({}));
+        // company_name מגיע מהמשתמשים; ניקח מהמשתמש הראשון אם קיים, אחרת ריק
+        const company = (data.users && data.users[0]) ? data.users[0].company_name : '';
+        const inp = document.getElementById('settingsCompanyName');
+        if (inp && company) inp.value = company;
+      } catch (_) {}
+
+      // טעינת toggle מ-localStorage
+      const toggle = document.getElementById('settingsNotifToggle');
+      if (toggle) toggle.checked = localStorage.getItem('hr_notif_enabled') === '1';
+      if (toggle) toggle.addEventListener('change', () => {
+        localStorage.setItem('hr_notif_enabled', toggle.checked ? '1' : '0');
+        showMessage(toggle.checked ? 'התראות הופעלו' : 'התראות כובו');
+      });
+    }
+
+    async function saveSettings(event) {
+      event.preventDefault();
+      const company = (document.getElementById('settingsCompanyName')?.value || '').trim();
+      if (!company) return;
+      try {
+        const res  = await fetch('/api/hr/settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_name: company }),
+        });
+        const data = await res.json().catch(() => ({}));
+        showMessage(data.success ? 'ההגדרות עודכנו בהצלחה ✓' : (data.message || 'שגיאה'));
+      } catch (err) {
+        showMessage('שגיאה בתקשורת עם השרת');
+      }
+    }
+
+    // ──────────────────────────────────────────────
+    // סינון טבלת ביצועים
+    // ──────────────────────────────────────────────
+    let _perfData = [];
+
+    function filterPerfTable() {
+      const q = (document.getElementById('perfSearchInput')?.value || '').toLowerCase();
+      const body = document.getElementById('teamPerformanceBody');
+      if (!body || !_perfData.length) return;
+      const filtered = _perfData.filter(job => job.job_title.toLowerCase().includes(q));
+      renderPerfRows(body, filtered);
+    }
+
+    function renderPerfRows(body, perf) {
+      if (perf.length === 0) {
+        body.innerHTML = '<div class="table-row"><div style="padding:16px;color:#718096;">אין תוצאות</div></div>';
+        return;
+      }
+      body.innerHTML = perf.map(job => {
+        const recruiterLabel = job.recruiter_email ? `<div class="job-recruiter">${job.recruiter_email}</div>` : '';
+        const handlingStr    = job.avg_handling_days != null ? `${job.avg_handling_days} ימים` : '—';
+        return `
+          <div class="table-row">
+            <div class="job-info">
+              <div><div class="job-title">${job.job_title}</div>${recruiterLabel}</div>
+              <div><div class="metric-value">${job.processed}/${job.pending}</div><div class="metric-label">טופלו/ממתינים</div></div>
+              <div><div class="metric-value">${handlingStr}</div><div class="metric-label">זמן טיפול</div></div>
+              <div>
+                <div class="metric-value">${job.acceptance_rate}%</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:${job.acceptance_rate}%"></div></div>
+              </div>
+              <div>
+                <div class="metric-value">${job.filtering_efficiency}%</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:${job.filtering_efficiency}%"></div></div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ──────────────────────────────────────────────
+    // סינון פידבק אלגוריתם
+    // ──────────────────────────────────────────────
+    let _feedbackData = [];
+
+    function filterFeedback() {
+      const val = document.getElementById('feedbackFilter')?.value || 'all';
+      const filtered = val === 'all' ? _feedbackData : _feedbackData.filter(f => f.direction === val);
+      renderFeedbackItems(filtered);
+    }
+
+    function renderFeedbackItems(feedback) {
+      const fbSection = document.getElementById('algoFeedbackSection');
+      if (!fbSection) return;
+      if (feedback.length === 0) {
+        fbSection.innerHTML = '<div style="padding:16px;color:#718096;">אין מקרי אי-התאמה בין ציון המערכת לציון אנושי</div>';
+        return;
+      }
+      fbSection.innerHTML = feedback.map(item => {
+        const isHigh      = item.direction === 'high';
+        const isLow       = item.direction === 'low';
+        const badgeClass  = isHigh ? 'score-high' : isLow ? 'score-low' : 'score-high';
+        const badgeText   = isHigh ? 'ציון גבוה מדי' : isLow ? 'ציון נמוך מדי' : 'חריגה';
+        const scoreLabel  = item.human_score != null ? `${item.algo_score}% → ${item.human_score}%` : `ציון מערכת: ${item.algo_score}%`;
+        const subLabel    = item.reviewer_email ? `${item.job_title} - ${item.reviewer_email}` : item.job_title;
+        return `
+          <div class="feedback-item">
+            <div class="candidate-info">
+              <div class="candidate-name">מועמד #${item.cv_id}</div>
+              <div class="candidate-job">${subLabel}</div>
+            </div>
+            <div class="feedback-score">
+              <span class="score-badge ${badgeClass}">${badgeText}</span>
+              <span>${scoreLabel}</span>
+            </div>
+            <div class="feedback-buttons">
+              <button class="feedback-btn ${isHigh ? 'btn-too-high' : 'btn-too-low'}"
+                      onclick="sendFeedback('${item.direction}', ${item.cv_id}, ${item.job_id})">
+                ${badgeText}
+              </button>
+              <button class="feedback-btn btn-send"
+                      onclick="sendFeedback('send', ${item.cv_id}, ${item.job_id})">
+                שלח פידבק
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+    }
 
     if (window.elementSdk) {
       window.elementSdk.init({

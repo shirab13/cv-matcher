@@ -1013,6 +1013,10 @@
 
         <!-- View 1: Jobs grid -->
         <div id="jobsGridView">
+          <input type="text" id="jobSearchInput" placeholder="🔍 חיפוש משרה לפי שם..."
+                 oninput="filterJobsGrid()"
+                 style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;
+                        font-size:14px;margin-bottom:16px;box-sizing:border-box;direction:rtl;">
           <div class="jobs-grid" id="jobsGrid"></div>
         </div>
 
@@ -1148,9 +1152,22 @@
 
       <!-- Job History Tab -->
       <div id="jobHistoryTab" class="tab-content">
+
+        <!-- View 1: Closed jobs list -->
         <div id="jobHistoryContent">
           <div style="color:#a0aec0;padding:20px;text-align:center;">טוען היסטוריה...</div>
         </div>
+
+        <!-- View 2: Closed job candidates (read-only) -->
+        <div id="closedJobDetailsView" style="display:none">
+          <div class="view-nav">
+            <button class="back-btn" onclick="goBackToHistory()">← חזרה להיסטוריה</button>
+            <span style="font-size:13px;color:#718096;background:#e2e8f0;padding:4px 10px;border-radius:12px;">צפייה בלבד</span>
+          </div>
+          <div id="closedJobInfoPanel"></div>
+          <div id="closedCandidateSections"></div>
+        </div>
+
       </div>
             
 
@@ -1181,7 +1198,10 @@
   </div>
 
   <script>
-    let currentJobId = null;
+    let currentJobId  = null;
+    let _mgrPage      = 1;
+    let _mgrTotalPages = 1;
+    const _MGR_PER_PAGE = 20;
 
     function showTab(tabName, event) {
       const tabContents = document.querySelectorAll('.tab-content');
@@ -1231,7 +1251,8 @@
       const rows = jobs.map(j => {
         const reason = CLOSED_REASON_LABELS[j.closed_reason] || { label: j.closed_reason || '—', cls: 'badge-pending' };
         return `
-          <div class="table-row">
+          <div class="table-row" onclick="showClosedJobCandidates(${j.id})"
+               style="cursor:pointer;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
             <div>
               <div style="font-weight:600;color:#1a202c;">${j.title}</div>
               ${j.location ? `<div style="color:#4a5568;font-size:12px;">${j.location}</div>` : ''}
@@ -1240,6 +1261,7 @@
             <div style="color:#4a5568;">${j.closed_at ? formatDate(j.closed_at) : '—'}</div>
             <div style="font-weight:600;color:#667eea;">${j.matched_count}</div>
             <div><span class="status-badge ${reason.cls}">${reason.label}</span></div>
+            <div style="color:#667eea;font-size:12px;">← צפה במועמדים</div>
           </div>`;
       }).join('');
 
@@ -1251,9 +1273,59 @@
             <div>נסגרה</div>
             <div>מתאימים</div>
             <div>סיבת סגירה</div>
+            <div></div>
           </div>
           ${rows}
         </div>`;
+    }
+
+    function goBackToHistory() {
+      document.getElementById('closedJobDetailsView').style.display = 'none';
+      document.getElementById('jobHistoryContent').style.display    = 'block';
+      currentJobId = null;
+    }
+
+    async function showClosedJobCandidates(jobId) {
+      currentJobId = jobId;
+      document.getElementById('jobHistoryContent').style.display    = 'none';
+      document.getElementById('closedJobDetailsView').style.display = 'block';
+      document.getElementById('closedJobInfoPanel').innerHTML =
+        '<div style="color:#4a5568;padding:20px;">טוען פרטי משרה...</div>';
+      document.getElementById('closedCandidateSections').innerHTML = '';
+
+      const candRes = await fetch(`/api/jobs/${jobId}/candidates?page=1&per_page=20&allow_closed=1`).catch(() => null);
+      const candData = candRes ? await candRes.json().catch(() => ({})) : {};
+
+      const job = candData.job || {};
+      const reasonInfo = CLOSED_REASON_LABELS[job.closed_reason] || { label: job.closed_reason || '—', cls: 'badge-pending' };
+
+      document.getElementById('closedJobInfoPanel').innerHTML = `
+        <div style="background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:20px;">
+          <div style="font-size:18px;font-weight:700;color:#1a202c;margin-bottom:8px;">${job.title || 'משרה סגורה'}</div>
+          <span class="status-badge ${reasonInfo.cls}">סגורה: ${reasonInfo.label}</span>
+        </div>`;
+
+      const candidates = candData.candidates || [];
+      _mgrTotalPages = candData.pages || 1;
+
+      if (candidates.length === 0) {
+        document.getElementById('closedCandidateSections').innerHTML =
+          '<div style="color:#a0aec0;padding:20px;text-align:center;">אין מועמדים לתצוגה</div>';
+        return;
+      }
+
+      renderCandidateSections(candidates, true);
+
+      // pagination for closed job candidates
+      const existing = document.getElementById('closedMgrPagination');
+      if (existing) existing.remove();
+      if (_mgrTotalPages > 1) {
+        const wrap = document.createElement('div');
+        wrap.id = 'closedMgrPagination';
+        wrap.style = 'display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;';
+        wrap.innerHTML = `<span style="font-size:13px;color:#4a5568;">עמוד 1 מתוך ${_mgrTotalPages} — לניווט בין עמודים פתח מחדש</span>`;
+        document.getElementById('closedCandidateSections').after(wrap);
+      }
     }
     
     
@@ -1369,36 +1441,19 @@
     }
 
 
-    async function renderJobs() {
+    let _allManagerJobs = [];
+
+    function renderJobCards(jobs) {
       const jobsGrid = document.getElementById('jobsGrid');
-      jobsGrid.innerHTML = '<div style="color:#4a5568;padding:20px;">טוען משרות...</div>';
-
-      let jobs = [];
-
-      try {
-        const res = await fetch('/api/jobs');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.jobs)) {
-            jobs = data.jobs;
-          }
-        }
-      } catch (err) {
-        console.error('שגיאה בטעינת משרות מהשרת:', err);
-      }
-
       if (jobs.length === 0) {
         jobsGrid.innerHTML = '<div style="color:#4a5568;padding:20px;">אין משרות פתוחות כרגע</div>';
         return;
       }
-
       jobsGrid.innerHTML = '';
-
       jobs.forEach(job => {
         const jobCard = document.createElement('div');
         jobCard.className = 'job-card';
         jobCard.onclick = () => showJobCandidates(job.id);
-
         jobCard.innerHTML = `
           <div class="job-title">${job.title}</div>
           <div class="job-details">
@@ -1420,6 +1475,31 @@
       });
     }
 
+    function filterJobsGrid() {
+      const q = (document.getElementById('jobSearchInput')?.value || '').toLowerCase();
+      const filtered = q ? _allManagerJobs.filter(j => (j.title || '').toLowerCase().includes(q)) : _allManagerJobs;
+      renderJobCards(filtered);
+    }
+
+    async function renderJobs() {
+      const jobsGrid = document.getElementById('jobsGrid');
+      jobsGrid.innerHTML = '<div style="color:#4a5568;padding:20px;">טוען משרות...</div>';
+
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.jobs)) {
+            _allManagerJobs = data.jobs;
+          }
+        }
+      } catch (err) {
+        console.error('שגיאה בטעינת משרות מהשרת:', err);
+      }
+
+      renderJobCards(_allManagerJobs);
+    }
+
 
     function goBackToJobs() {
       document.getElementById('jobsGridView').style.display = 'block';
@@ -1427,8 +1507,10 @@
       currentJobId = null;
     }
 
-    async function showJobCandidates(jobId) {
+    async function showJobCandidates(jobId, opts = {}) {
       currentJobId = jobId;
+      _mgrPage = opts.page || 1;
+      const allowClosed = opts.allowClosed ? '&allow_closed=1' : '';
 
       document.getElementById('jobsGridView').style.display = 'none';
       document.getElementById('jobDetailsView').style.display = 'block';
@@ -1438,20 +1520,44 @@
       // fetch job details and candidates in parallel
       const [jobRes, candRes] = await Promise.all([
         fetch(`/api/jobs/${jobId}`),
-        fetch(`/api/jobs/${jobId}/candidates`),
+        fetch(`/api/jobs/${jobId}/candidates?page=${_mgrPage}&per_page=${_MGR_PER_PAGE}${allowClosed}`),
       ]);
 
       const jobData  = await jobRes.json().catch(() => ({}));
       const candData = await candRes.json().catch(() => ({}));
 
-      if (!jobData.success) {
+      if (!jobData.success && !candData.success) {
         document.getElementById('jobInfoPanel').innerHTML = '<div style="color:#e53e3e;padding:20px;">שגיאה בטעינת פרטי המשרה</div>';
         return;
       }
 
+      _mgrTotalPages = candData.pages || 1;
       window._loadedCandidates = candData.candidates || [];
-      renderJobInfoPanel(jobData.job);
-      renderCandidateSections(window._loadedCandidates);
+      renderJobInfoPanel(jobData.job || candData.job || {});
+      renderCandidateSections(window._loadedCandidates, opts.readOnly || false);
+      renderMgrPagination(jobId, opts);
+    }
+
+    function renderMgrPagination(jobId, opts) {
+      const existing = document.getElementById('mgrPaginationControls');
+      if (existing) existing.remove();
+      if (_mgrTotalPages <= 1) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'mgrPaginationControls';
+      wrap.style = 'display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;';
+      wrap.innerHTML = `
+        <button ${_mgrPage <= 1 ? 'disabled' : ''}
+          onclick="showJobCandidates(${jobId}, ${JSON.stringify({...opts, page: _mgrPage - 1})})"
+          style="padding:7px 16px;border:1px solid #e2e8f0;border-radius:6px;background:white;cursor:pointer;font-size:13px;">
+          &#8249; הקודם
+        </button>
+        <span style="font-size:13px;color:#4a5568;">עמוד ${_mgrPage} מתוך ${_mgrTotalPages}</span>
+        <button ${_mgrPage >= _mgrTotalPages ? 'disabled' : ''}
+          onclick="showJobCandidates(${jobId}, ${JSON.stringify({...opts, page: _mgrPage + 1})})"
+          style="padding:7px 16px;border:1px solid #e2e8f0;border-radius:6px;background:white;cursor:pointer;font-size:13px;">
+          הבא &#8250;
+        </button>`;
+      document.getElementById('candidateSections').after(wrap);
     }
 
     function renderJobInfoPanel(job) {
@@ -1485,20 +1591,21 @@
       `;
     }
 
-    function renderCandidateSections(candidates) {
+    function renderCandidateSections(candidates, readOnly = false) {
       const matching    = candidates.filter(c => c.recruiter_status === 'מתאים');
       const notMatching = candidates.filter(c => c.recruiter_status === 'לא מתאים');
       const pending     = candidates.filter(c => c.recruiter_status !== 'מתאים' && c.recruiter_status !== 'לא מתאים');
 
-      const container = document.getElementById('candidateSections');
+      const containerId = readOnly ? 'closedCandidateSections' : 'candidateSections';
+      const container = document.getElementById(containerId);
       container.innerHTML = '';
 
-      container.appendChild(buildCandidateSection('מועמדים מתאימים',     matching,    'section-matching'));
-      container.appendChild(buildCandidateSection('ממתינים לסיווג',       pending,     'section-pending'));
-      container.appendChild(buildCandidateSection('מועמדים לא מתאימים',  notMatching, 'section-not-matching'));
+      container.appendChild(buildCandidateSection('מועמדים מתאימים',     matching,    'section-matching',     readOnly));
+      container.appendChild(buildCandidateSection('ממתינים לסיווג',       pending,     'section-pending',      readOnly));
+      container.appendChild(buildCandidateSection('מועמדים לא מתאימים',  notMatching, 'section-not-matching',  readOnly));
     }
 
-    function buildCandidateSection(title, candidates, sectionClass) {
+    function buildCandidateSection(title, candidates, sectionClass, readOnly = false) {
       const section = document.createElement('div');
       section.className = `candidate-section ${sectionClass}`;
 
@@ -1512,15 +1619,21 @@
       candidates.forEach(c => {
         const row = document.createElement('div');
         row.className = 'candidate-row';
-        const score    = c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—';
+        const score    = c.matchScore != null ? `${Math.min(100, c.matchScore).toFixed(1)}%` : '—';
         const stageTag = stageBadge(c.latest_stage || '_waiting');
         const llmWarn  = c.llm_flag ? `<span class="llm-flag-badge" title="ציון האלגוריתם והמודל שונים משמעותית – מומלץ לבדוק">⚠️ בדוק ציון</span>` : '';
+        const reviewerTag = c.reviewer_email
+          ? `<span style="font-size:11px;color:#718096;margin-right:6px;">סקר: ${c.reviewer_email}</span>` : '';
+        const actionBtn = readOnly
+          ? `<span style="font-size:11px;color:#a0aec0;padding:4px 8px;background:#f7fafc;border-radius:6px;">צפייה בלבד</span>`
+          : `<button class="candidate-row-action" onclick="showCandidateProfile(${currentJobId}, ${c.cv_id})">צפה בפרופיל</button>`;
         row.innerHTML = `
           <span class="candidate-row-name">מועמד/ת ${c.cv_id}</span>
           <span class="candidate-row-score">התאמה: ${score}</span>
           <span>${stageTag}</span>
           ${llmWarn}
-          <button class="candidate-row-action" onclick="showCandidateProfile(${currentJobId}, ${c.cv_id})">צפה בפרופיל</button>
+          ${reviewerTag}
+          ${actionBtn}
         `;
         section.appendChild(row);
       });
@@ -1533,8 +1646,8 @@
     async function goBackToJobDetails() {
       document.getElementById('candidateProfileView').style.display = 'none';
       currentCvId = null;
-      // re-fetch candidates so stage badges are up to date
-      const res  = await fetch(`/api/jobs/${currentJobId}/candidates`).catch(() => null);
+      // re-fetch current page so stage badges are up to date
+      const res  = await fetch(`/api/jobs/${currentJobId}/candidates?page=${_mgrPage}&per_page=${_MGR_PER_PAGE}`).catch(() => null);
       const data = res ? await res.json().catch(() => ({})) : {};
       window._loadedCandidates = data.candidates || [];
       renderCandidateSections(window._loadedCandidates);
@@ -1563,15 +1676,15 @@
         'לא מתאים': { cls: 'badge-not-matching', label: 'לא מתאים' },
       };
       const badge = statusMap[c.recruiter_status] || { cls: 'badge-pending', label: 'ממתין לסיווג' };
-      const llmScore  = c.llm_score != null ? Math.round(c.llm_score) : null;
+      const llmScore  = c.llm_score != null ? Math.min(100, c.llm_score) : null;
       const algoScore = c.scores
-        ? Math.round((c.scores.age_score||0)+(c.scores.distance_score||0)+(c.scores.must_requirements_score||0)+(c.scores.years_experience_score||0)+(c.scores.nice_to_have_score||0))
+        ? Math.min(100, (c.scores.age_score||0)+(c.scores.distance_score||0)+(c.scores.must_requirements_score||0)+(c.scores.years_experience_score||0)+(c.scores.nice_to_have_score||0))
         : null;
       // Display the LLM score as the main score when available
-      const score = llmScore != null ? `${llmScore}%` : (c.matchScore != null ? `${Math.round(c.matchScore)}%` : '—');
+      const score = llmScore != null ? `${llmScore.toFixed(1)}%` : (c.matchScore != null ? `${Math.min(100, c.matchScore).toFixed(1)}%` : '—');
       const llmBlock = c.llm_flag && llmScore != null && algoScore != null ? `
         <div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border:1px solid #f6ad55;border-radius:8px;font-size:13px;color:#744210;">
-          ⚠️ <strong>שים לב:</strong> ציון המודל (${llmScore}%) וציון האלגוריתם (${algoScore}%) שונים משמעותית.
+          ⚠️ <strong>שים לב:</strong> ציון המודל (${llmScore.toFixed(1)}%) וציון האלגוריתם (${algoScore.toFixed(1)}%) שונים משמעותית.
           מומלץ לבחון את הפרופיל בעצמך.
         </div>` : '';
       document.getElementById('profileHeader').innerHTML = `
@@ -1621,12 +1734,19 @@
 
     function renderProfileRecruiterNote(c) {
       const note = c.recruiter_feedback || '';
+      const reviewerLine = c.reviewer_email
+        ? `<div style="margin-top:10px;font-size:12px;color:#718096;">
+             נסקר ע"י: <strong>${c.reviewer_email}</strong>
+             ${c.reviewed_at ? `· ${new Date(c.reviewed_at).toLocaleDateString('he-IL')}` : ''}
+           </div>`
+        : '';
       document.getElementById('profileRecruiterNote').innerHTML = `
         <div class="profile-panel-title">הערת מגייס</div>
         ${note
           ? `<div class="recruiter-note-box">${note}</div>`
           : `<div style="color:#a0aec0;font-size:14px;">אין הערה</div>`}
         ${c.human_score != null ? `<div style="margin-top:8px;font-size:13px;color:#667eea;font-weight:600;">ציון לפי מגייס: ${Math.round(c.human_score)}%</div>` : ''}
+        ${reviewerLine}
       `;
     }
 
@@ -1729,17 +1849,46 @@
       }
     }
 
-    function renderCvEmbed(cvId, ext) {
-      // Always use the pdf endpoint — it serves PDF directly or converts docx on the fly
+    async function renderCvEmbed(cvId, ext) {
       const pdfUrl      = `/api/candidates/${cvId}/cv-file-pdf`;
       const downloadUrl = `/api/candidates/${cvId}/cv-file?download=1`;
+      const panel = document.getElementById('cvEmbedPanel');
 
-      document.getElementById('cvEmbedPanel').innerHTML = `
+      panel.innerHTML = `
         <div class="profile-panel-title">קורות חיים (אנונימיים)</div>
-        <iframe class="cv-iframe" src="${pdfUrl}" title="קורות חיים"></iframe>
-        <div style="margin-top:12px;text-align:center">
-          <a href="${downloadUrl}" style="font-size:13px;color:#667eea;text-decoration:none;font-weight:600;">⬇ הורד קובץ מקורי</a>
+        <div style="color:#a0aec0;padding:20px;text-align:center;">טוען קובץ...</div>`;
+
+      const docxPlaceholder = `
+        <div class="profile-panel-title">קורות חיים (אנונימיים)</div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+              height:220px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;
+              gap:12px;text-align:center;padding:24px;">
+          <div style="font-size:40px;">📄</div>
+          <div style="font-weight:600;font-size:14px;color:#4a5568;">תצוגה מקדימה אינה זמינה לקבצי Word</div>
+          <div style="font-size:12px;color:#a0aec0;">לחץ על הכפתור להורדה וצפייה</div>
+          <a href="${downloadUrl}"
+             style="margin-top:4px;padding:9px 22px;background:#667eea;color:white;border-radius:8px;
+                    text-decoration:none;font-weight:600;font-size:13px;">
+            ⬇ הורד קורות חיים
+          </a>
         </div>`;
+
+      try {
+        const check = await fetch(pdfUrl);
+        const contentType = check.headers.get('content-type') || '';
+        if (!check.ok || contentType.includes('application/json')) {
+          panel.innerHTML = docxPlaceholder;
+          return;
+        }
+        panel.innerHTML = `
+          <div class="profile-panel-title">קורות חיים (אנונימיים)</div>
+          <iframe class="cv-iframe" src="${pdfUrl}" title="קורות חיים"></iframe>
+          <div style="margin-top:12px;text-align:center">
+            <a href="${downloadUrl}" style="font-size:13px;color:#667eea;text-decoration:none;font-weight:600;">⬇ הורד קובץ</a>
+          </div>`;
+      } catch (err) {
+        panel.innerHTML = docxPlaceholder;
+      }
     }
 
     function promptCloseJob() {

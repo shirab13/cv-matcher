@@ -1214,7 +1214,7 @@
       event.target.closest('.tab').classList.add('active');
 
       if (tabName === 'openJobs') {
-        showJobsList();
+        goBackToJobs();
       } else if (tabName === 'team') {
         fetchTeamUsers();
       } else if (tabName === 'jobHistory') {

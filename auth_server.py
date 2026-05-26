@@ -64,6 +64,7 @@ print("DB ABS PATH =", os.path.abspath(DB_PATH))
 _BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR  = os.path.join(_BASE_DIR, "src", "input")
 OUTPUT_DIR = os.path.join(_BASE_DIR, "src", "output")
+_LEGACY_OUTPUT_DIR = os.path.join(_BASE_DIR, "output")  # נתיב ישן לפני המעבר ל-src/
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -1224,10 +1225,10 @@ def serve_candidate_cv(cv_id):
     if row is None:
         return jsonify({"success": False, "message": "מועמד לא נמצא"}), 404
 
-    # אבטחת נתיב: ודא שהקובץ נמצא בתוך OUTPUT_DIR בלבד
+    # אבטחת נתיב: ודא שהקובץ נמצא בתוך OUTPUT_DIR (או נתיב ישן לאחורה-תואם)
     safe_path = os.path.abspath(row["file_path"])
-    allowed_dir = os.path.abspath(OUTPUT_DIR)
-    if not safe_path.startswith(allowed_dir + os.sep) and safe_path != allowed_dir:
+    _allowed = {os.path.abspath(OUTPUT_DIR), os.path.abspath(_LEGACY_OUTPUT_DIR)}
+    if not any(safe_path.startswith(d + os.sep) or safe_path == d for d in _allowed):
         return jsonify({"success": False, "message": "נתיב קובץ לא תקין"}), 403
 
     if not os.path.isfile(safe_path):
@@ -1266,8 +1267,8 @@ def serve_candidate_cv_as_pdf(cv_id):
         return jsonify({"success": False, "message": "מועמד לא נמצא"}), 404
 
     safe_path = os.path.abspath(row["file_path"])
-    allowed_dir = os.path.abspath(OUTPUT_DIR)
-    if not safe_path.startswith(allowed_dir + os.sep) and safe_path != allowed_dir:
+    _allowed = {os.path.abspath(OUTPUT_DIR), os.path.abspath(_LEGACY_OUTPUT_DIR)}
+    if not any(safe_path.startswith(d + os.sep) or safe_path == d for d in _allowed):
         return jsonify({"success": False, "message": "נתיב קובץ לא תקין"}), 403
 
     if not os.path.isfile(safe_path):

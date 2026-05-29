@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS cv_scores (
   age_reason TEXT,
   age_confidence TEXT,
   age_factor REAL,
-  age_reason TEXT,
 
   updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
 

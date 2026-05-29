@@ -383,6 +383,9 @@ def hr_manager_required(f):
 # -----------------קליטת משרה חדשה-----------------
 @app.route("/api/jobs", methods=["POST"])
 def create_job():
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "לא מחובר"}), 401
+
     data = request.get_json() or {}
 
     title = (data.get("title") or "").strip()
